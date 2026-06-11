@@ -1,23 +1,31 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
-import { AdminCampsPage } from '@/pages/AdminCampsPage'
 import { PublicRegistrationPage } from '@/pages/PublicRegistrationPage'
+import { CampsListPage } from '@/features/camps/pages/CampsListPage'
+import { NewCampPage } from '@/features/camps/pages/NewCampPage'
+import { CampLandingPage } from '@/features/camps/pages/CampLandingPage'
+import { CampSettingsPage } from '@/features/camps/pages/CampSettingsPage'
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  return <ProtectedRoute>{children}</ProtectedRoute>
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/r/:campId" element={<PublicRegistrationPage />} />
-        <Route
-          path="/admin/camps"
-          element={
-            <ProtectedRoute>
-              <AdminCampsPage />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* Admin — all protected */}
+        <Route path="/admin/camps" element={<AdminRoute><CampsListPage /></AdminRoute>} />
+        <Route path="/admin/camps/new" element={<AdminRoute><NewCampPage /></AdminRoute>} />
+        <Route path="/admin/camps/:id" element={<AdminRoute><CampLandingPage /></AdminRoute>} />
+        <Route path="/admin/camps/:id/settings" element={<AdminRoute><CampSettingsPage /></AdminRoute>} />
+
+        {/* Fallbacks */}
         <Route path="/admin" element={<Navigate to="/admin/camps" replace />} />
         <Route path="/" element={<Navigate to="/admin/camps" replace />} />
       </Routes>
