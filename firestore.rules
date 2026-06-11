@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+          && exists(/databases/$(db)/documents/admins/$(request.auth.uid));
+    }
+
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false; // console-only — seeded manually
+    }
+
+    match /camps/{campId} {
+      allow read, write: if isAdmin();
+
+      match /subGroups/{subGroupId} {
+        allow read: if true; // public — needed for the registration form
+        allow write: if isAdmin();
+      }
+
+      match /roomTypes/{roomTypeId} {
+        allow read, write: if isAdmin();
+      }
+
+      match /rooms/{roomId} {
+        allow read, write: if isAdmin();
+      }
+
+      match /participants/{participantId} {
+        allow read, update, delete: if isAdmin();
+
+        // Public self-registration. Cloud Function will handle this path
+        // in production for transactional integrity, but rules still gate it.
+        allow create: if
+          request.resource.data.registrationState == 'REGISTERED'
+          && request.resource.data.paymentState == 'PENDING'
+          && request.resource.data.checkInState == 'NOT_ARRIVED'
+          && request.resource.data.tags.size() == 0
+          && request.resource.data.keys().hasAny(['roomId']) == false
+          && request.resource.data.fullName is string
+          && request.resource.data.phone is string
+          && request.resource.data.subGroupId is string
+          && request.resource.data.gender in ['M', 'F']
+          && get(/databases/$(db)/documents/camps/$(campId)).data.registrationOpen == true;
+      }
+    }
+  }
+}
