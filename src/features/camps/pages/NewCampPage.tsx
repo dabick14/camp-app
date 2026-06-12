@@ -22,6 +22,7 @@ export function NewCampPage() {
         minAge: values.minAge,
         maxAge: values.maxAge,
         maxParticipants: values.maxParticipants,
+        currency: values.currency,
         registrationOpen: values.registrationOpen,
       },
       uid,

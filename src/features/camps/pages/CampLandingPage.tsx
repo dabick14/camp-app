@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, Settings, Users } from 'lucide-react'
+import { ChevronLeft, DoorOpen, Settings, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -95,6 +95,12 @@ export function CampLandingPage() {
           <Link to={`/admin/camps/${camp.id}/settings`}>
             <Settings className="mr-2 h-4 w-4" />
             Settings
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link to={`/admin/camps/${camp.id}/rooms`}>
+            <DoorOpen className="mr-2 h-4 w-4" />
+            Rooms
           </Link>
         </Button>
         <Button asChild variant="outline" disabled>

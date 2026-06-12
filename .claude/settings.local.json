@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx shadcn@latest init -y)"
+      "Bash(npx shadcn@latest init -y)",
+      "Bash(firebase projects:list)",
+      "Bash(firebase login *)",
+      "Bash(firebase use *)"
     ]
   }
 }

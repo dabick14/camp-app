@@ -1,0 +1,6 @@
+number,type,gender,capacity,notes
+102,Dormitory,M,,Duplicate
+401,Mansion,M,2,Bad type
+402,Standard,X,4,Bad gender
+403,Standard,M,abc,Bad capacity
+404,Standard,M,4,Should work

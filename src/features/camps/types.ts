@@ -11,6 +11,7 @@ export interface Camp {
   minAge?: number
   maxAge?: number
   maxParticipants?: number
+  currency: string
   registrationOpen: boolean
   createdAt: Timestamp
   createdBy: string
@@ -37,5 +38,6 @@ export interface CampFormValues {
   minAge?: number
   maxAge?: number
   maxParticipants?: number
+  currency: string
   registrationOpen: boolean
 }

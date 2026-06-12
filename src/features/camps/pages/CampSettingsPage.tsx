@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { auth } from '@/lib/firebase'
 import { dateStrToTs, tsToDateStr } from '@/lib/dates'
+import { RoomTypesEditor } from '@/features/rooms/components/RoomTypesEditor'
 import { CampForm } from '../components/CampForm'
 import { SubGroupsEditor } from '../components/SubGroupsEditor'
 import { getCamp, updateCamp } from '../services/campService'
@@ -47,6 +48,7 @@ export function CampSettingsPage() {
         minAge: values.minAge,
         maxAge: values.maxAge,
         maxParticipants: values.maxParticipants,
+        currency: values.currency,
         registrationOpen: values.registrationOpen,
       },
       uid,
@@ -81,6 +83,7 @@ export function CampSettingsPage() {
     minAge: camp.minAge,
     maxAge: camp.maxAge,
     maxParticipants: camp.maxParticipants,
+    currency: camp.currency ?? 'GHS',
     registrationOpen: camp.registrationOpen,
   }
 
@@ -108,6 +111,16 @@ export function CampSettingsPage() {
           Registrants pick exactly one sub-group. To remove a sub-group, rename it.
         </p>
         <SubGroupsEditor campId={id!} />
+      </div>
+
+      <Separator className="my-8" />
+
+      <div>
+        <h2 className="mb-4 text-lg font-medium">Room types</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Define types before adding rooms. Capacity here is the default; individual rooms can override it.
+        </p>
+        <RoomTypesEditor campId={id!} currency={camp.currency ?? 'GHS'} />
       </div>
     </div>
   )

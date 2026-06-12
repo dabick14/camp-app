@@ -26,6 +26,7 @@ const schema = z
     minAge: optionalInt(0),
     maxAge: optionalInt(0),
     maxParticipants: optionalInt(1),
+    currency: z.string().min(1, 'Currency is required'),
     registrationOpen: z.boolean(),
   })
   .refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
@@ -44,6 +45,7 @@ type Schema = {
   minAge?: number
   maxAge?: number
   maxParticipants?: number
+  currency: string
   registrationOpen: boolean
 }
 
@@ -88,6 +90,7 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
       endDate: '',
       description: '',
       imageUrl: '',
+      currency: 'GHS',
       registrationOpen: false,
       ...defaultValues,
     },
@@ -133,6 +136,9 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
             {...register('maxParticipants', { valueAsNumber: true })}
             placeholder="—"
           />
+        </Field>
+        <Field label="Currency" error={errors.currency?.message}>
+          <Input {...register('currency')} placeholder="GHS" />
         </Field>
         <Field label="Image URL" error={errors.imageUrl?.message}>
           <Input {...register('imageUrl')} placeholder="https://…" />
