@@ -4,7 +4,8 @@
       "Bash(npx shadcn@latest init -y)",
       "Bash(firebase projects:list)",
       "Bash(firebase login *)",
-      "Bash(firebase use *)"
+      "Bash(firebase use *)",
+      "Bash(npm run *)"
     ]
   }
 }

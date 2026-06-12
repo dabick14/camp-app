@@ -3,7 +3,8 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
-import { PublicRegistrationPage } from '@/pages/PublicRegistrationPage'
+import { RegistrationPage } from '@/features/registration/RegistrationPage'
+import { ConfirmationPage } from '@/features/registration/ConfirmationPage'
 import { CampsListPage } from '@/features/camps/pages/CampsListPage'
 import { NewCampPage } from '@/features/camps/pages/NewCampPage'
 import { CampLandingPage } from '@/features/camps/pages/CampLandingPage'
@@ -21,7 +22,8 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/r/:campId" element={<PublicRegistrationPage />} />
+          <Route path="/r/:campId" element={<RegistrationPage />} />
+          <Route path="/r/:campId/done" element={<ConfirmationPage />} />
 
           {/* Admin — all protected */}
           <Route path="/admin/camps" element={<AdminRoute><CampsListPage /></AdminRoute>} />
