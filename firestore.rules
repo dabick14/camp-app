@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     match /camps/{campId} {
-      allow read: if isAdmin() || resource.data.registrationOpen == true;
+      allow read: if true; // camp metadata is not sensitive; registrationOpen gating is done client-side
       allow write: if isAdmin();
 
       match /subGroups/{subGroupId} {
