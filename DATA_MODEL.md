@@ -1,7 +1,5 @@
 # Data Model — Firestore
 
-Subcollection structure. Queries naturally scoped, security rules simple.
-
 ## Collections
 
 ```
@@ -38,8 +36,8 @@ Subcollection structure. Queries naturally scoped, security rules simple.
   imageUrl?: string;
   minAge?: number;
   maxAge?: number;
-  maxParticipants?: number;        // soft cap
-  currency: string;                // "GHS" for now
+  maxParticipants?: number;
+  currency: string;                // "GHS" default
   registrationOpen: boolean;
   createdAt: Timestamp;
   createdBy: string;
@@ -62,14 +60,15 @@ Subcollection structure. Queries naturally scoped, security rules simple.
 ```ts
 {
   name: string;
-  price: number;                   // fee charged for this type
-  defaultCapacity: number;
+  price: number;
+  defaultCapacity: number;         // typically 1, 2, 4, 20, etc.
   allowOverbook: boolean;
   order: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
+No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacity: 1` — only the registrant is in the system; the spouse/family is outside our view.
 
 ### `camps/{campId}/rooms/{roomId}`
 ```ts
@@ -91,42 +90,53 @@ Subcollection structure. Queries naturally scoped, security rules simple.
 ### `camps/{campId}/participants/{participantId}`
 ```ts
 {
-  // Identity
+  // Identity (form fields)
   fullName: string;
   phone: string;
   email?: string;
   gender: 'M' | 'F';
   dateOfBirth?: Timestamp;
   age?: number;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
+  // NOTE: emergency contact fields REMOVED.
 
   // Sub-group
   subGroupId: string;
   subGroupName: string;
 
-  // Room type preference (set at registration, drives fee)
+  // Room type preference
   roomTypePreferenceId: string;
   roomTypePreferenceName: string;
-  feeOwed: number;                 // locked at registration; updates only when room type changes
+  feeOwed: number;
 
-  // Registration & check-in states (FLAT strings)
+  // Tags (multi, admin-managed post-registration)
+  tags: string[];                  // default []
+
+  // States
   registrationState: 'REGISTERED' | 'CANCELLED';
   checkInState: 'NOT_ARRIVED' | 'ARRIVED';
-  // NOTE: paymentState is DERIVED, not stored. Compute from allocations.
+  // paymentState DERIVED — not stored.
 
-  // Room assignment (set on assignment, blocked unless paid)
+  // Room assignment
   roomId?: string;
   roomNumber?: string;
   roomAssignedBy?: string;
   roomAssignedAt?: Timestamp;
 
-  // Cached payment total for fast reads (kept in sync via allocation writes)
-  amountPaid: number;              // default 0; updated transactionally with allocations
+  // Cached payment total
+  amountPaid: number;              // default 0
+
+  // Audit-only override flag
+  // Set when admin assigns a room to a non-PAID/WAIVED participant.
+  // Visible in UI as a red banner and counted on dashboard.
+  roomedWithoutFullPayment: boolean;
+  roomedWithoutFullPaymentNote?: string;
 
   // Check-in audit
   checkedInBy?: string;
   checkedInAt?: Timestamp;
+
+  // Source: 'self' for public form, admin uid for admin-side add
+  source: 'self' | string;         // 'self' or admin uid
 
   // General
   notes?: string;
@@ -136,186 +146,89 @@ Subcollection structure. Queries naturally scoped, security rules simple.
 }
 ```
 
-**Deriving `paymentState`** (computed in the UI, not stored):
+**Deriving `paymentState`:**
+- `feeOwed === 0` → `WAIVED`
 - `amountPaid >= feeOwed` → `PAID`
 - `0 < amountPaid < feeOwed` → `PARTIAL`
-- `amountPaid === 0` → `PENDING`
-- `feeOwed === 0` (admin waived) → `WAIVED`
+- else → `PENDING`
 
 ### `camps/{campId}/paymentBatches/{batchId}`
 ```ts
 {
-  referenceCode: string;           // human-readable: "CHOIR-042"
+  referenceCode: string;           // e.g. "GALATIAN-007"
   subGroupId: string;
-  subGroupName: string;            // denormalized
+  subGroupName: string;
   amountReceived: number;
-  amountAllocated: number;         // sum of allocations; kept in sync
+  amountAllocated: number;
   method: 'MOMO' | 'CASH' | 'BANK' | 'OTHER';
-  externalReference?: string;      // MoMo TXID, bank ref, etc.
+  externalReference?: string;
   receivedAt: Timestamp;
-  receivedBy: string;              // admin uid who recorded the batch
+  receivedBy: string;
   notes?: string;
-  status: 'OPEN' | 'RECONCILED';   // OPEN = unallocated funds remain; RECONCILED = admin closed it
-  varianceAcknowledged: boolean;   // true if admin closed with amountAllocated != amountReceived
+  status: 'OPEN' | 'RECONCILED';
+  varianceAcknowledged: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 ```
-
-Reference code generation: `{SUBGROUP_PREFIX}-{SEQUENCE}` where prefix is the first 5 alphanumeric chars of sub-group name uppercased, and sequence is a per-camp counter. Collision check on write.
 
 ### `camps/{campId}/allocations/{allocationId}`
 ```ts
 {
   batchId: string;
   participantId: string;
-  participantName: string;         // denormalized for audit
+  participantName: string;
   amount: number;
   createdAt: Timestamp;
   createdBy: string;
-  // No update path — allocations are immutable. To correct, void + re-create.
-  voided: boolean;                 // soft-delete
+  voided: boolean;
   voidedBy?: string;
   voidedAt?: Timestamp;
   voidReason?: string;
 }
 ```
 
-## Transactions you MUST get right
+## Key derivations
 
-### Creating allocations from a CSV upload
-Wrap in a single Firestore transaction OR a Cloud Function:
+### Registration gating by reconciliation
+On the public registration form, after the registrant picks a sub-group, query:
 ```
-1. Read batch, confirm status === 'OPEN'
-2. For each row:
-   a. Read participant doc
-   b. Create allocation doc (immutable record)
-   c. Increment participant.amountPaid by row.amount
-3. Increment batch.amountAllocated by sum of rows
-4. If batch.amountAllocated > batch.amountReceived: abort (overspend)
+batches where subGroupId === picked AND status === 'OPEN' AND (amountReceived - amountAllocated) > 0
 ```
-The whole upload must succeed or fail atomically. No partial writes.
+If any results, block submission with the council-leader message. Otherwise, allow.
 
-### Voiding an allocation
-```
-1. Read allocation, confirm not already voided
-2. Set allocation.voided = true (audit)
-3. Decrement participant.amountPaid by allocation.amount
-4. Decrement batch.amountAllocated by allocation.amount
-5. If batch was RECONCILED, set back to OPEN
-```
+The Cloud Function `registerParticipant` MUST repeat this check server-side — the client-side check is UX only. Admin-side "Add Participant" form bypasses this check by design (uses a separate Cloud Function `adminAddParticipant`).
 
-### Assigning a room
-```
-1. Read participant. Verify derived paymentState in ['PAID', 'WAIVED'].
-2. Read room. Verify exists, matches participant gender.
-3. If currentOccupancy >= capacity:
-     - If roomType.allowOverbook: warn UI, proceed
-     - Else: abort
-4. If participant.roomId exists: decrement old room's currentOccupancy
-5. Write participant: roomId, roomNumber, roomAssignedBy/At, checkInState=ARRIVED, checkedInBy/At
-6. Increment new room's currentOccupancy
-```
+### Override flag on room assignment
+When admin clicks Assign Room and the participant's derived `paymentState` is `PENDING` or `PARTIAL`:
+- Show confirmation modal: "This participant has not paid in full. Assigning anyway requires a reason."
+- Required text input for reason
+- On confirm, set `roomedWithoutFullPayment: true` and store the reason
+- All other transaction steps proceed normally
 
-### Updating room type (changes fee)
-```
-1. Read new roomType, capture current price
-2. Write participant: roomTypePreferenceId, roomTypePreferenceName, feeOwed = newType.price
-3. Recompute participant.paymentState in UI (derived; may now be PAID, PARTIAL, or PENDING)
-4. If participant had a roomId of the OLD type, do NOT auto-unassign. Admin must manually re-room.
-```
+If a later payment moves them to PAID, the flag stays `true` (for audit). To clear it, admin must manually unset (or it persists as an "was once short" indicator — design choice).
 
-## Security rules (sketch)
+## Transactions (unchanged from prior spec)
+- Creating allocations from CSV upload — see PAYMENTS_SPEC.md
+- Voiding allocations
+- Assigning rooms
+- Changing room type (recomputes feeOwed)
+
+## Security rules (with new public read for batches)
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    function isAdmin() {
-      return request.auth != null
-          && exists(/databases/$(db)/documents/admins/$(request.auth.uid));
-    }
-
-    match /admins/{uid} {
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    match /camps/{campId} {
-      allow read: if isAdmin() || resource.data.registrationOpen == true;
-      allow write: if isAdmin();
-
-      match /subGroups/{subGroupId} {
-        allow read: if true;                // public for registration form
-        allow write: if isAdmin();
-      }
-
-      match /roomTypes/{roomTypeId} {
-        allow read: if true;                // public — needed to show prices on reg form
-        allow write: if isAdmin();
-      }
-
-      match /rooms/{roomId} {
-        allow read, write: if isAdmin();
-      }
-
-      match /participants/{participantId} {
-        allow read, update, delete: if isAdmin();
-
-        // Public CREATE for self-registration
-        allow create: if
-          request.resource.data.registrationState == 'REGISTERED'
-          && request.resource.data.checkInState == 'NOT_ARRIVED'
-          && request.resource.data.amountPaid == 0
-          && request.resource.data.roomId == null
-          && request.resource.data.fullName is string
-          && request.resource.data.phone is string
-          && request.resource.data.subGroupId is string
-          && request.resource.data.roomTypePreferenceId is string
-          && request.resource.data.gender in ['M', 'F']
-          && get(/databases/$(db)/documents/camps/$(campId)).data.registrationOpen == true;
-      }
-
-      match /paymentBatches/{batchId} {
-        allow read, write: if isAdmin();
-      }
-
-      match /allocations/{allocationId} {
-        allow read, create: if isAdmin();
-        allow update: if isAdmin();         // void path
-        allow delete: if false;             // never hard-delete allocations
-      }
-    }
-  }
+match /camps/{campId}/paymentBatches/{batchId} {
+  // Limited public read: needed so the public registration form
+  // can check for OPEN batches with unallocated balance.
+  allow get: if true;
+  allow list: if isAdmin();        // listing requires admin
+  allow write: if isAdmin();
 }
 ```
+This is a trade-off: anyone with a camp ID can read individual batch docs. Acceptable since batches don't contain personal data — only sub-group name and amounts. If this becomes a concern, move the gating check into the Cloud Function and lock batches to admins only.
 
-## Indexes you'll need
-- `participants` by `subGroupId` + `registrationState`
-- `participants` by `gender` + `registrationState`
-- `participants` by `roomId` (for occupancy reverse lookups)
-- `allocations` by `participantId` + `voided`
-- `allocations` by `batchId` + `voided`
-- `paymentBatches` by `subGroupId` + `status`
+All other rules unchanged from prior spec.
 
-## Public stats page derivation
-For `/stats/:campId`, fetch from camp's collections:
-- Total registered = count of participants where `registrationState === 'REGISTERED'`
-- Total paid = count where `amountPaid >= feeOwed AND feeOwed > 0`
-- Total roomed = count where `roomId != null`
-- Per sub-group: same three counts grouped by `subGroupId`
-
-For v1, do this client-side with a single bulk read per page load. Scale-pass later if needed.
-
-## CSV formats
-
-### Roster CSV (generated by admin, sent to leader)
-```
-participantId,fullName,phone,roomTypePreference,feeOwed,amountPaid
-{uuid},John Doe,0244111222,Standard,400,
-{uuid},Jane Doe,0244333444,Premium,600,
-```
-The `amountPaid` column is empty. Leader fills it in. They should not edit other columns.
-
-### Allocations CSV (returned by leader, uploaded by admin)
-Same shape as roster CSV. System ignores all columns except `participantId` and `amountPaid`. Rows with empty `amountPaid` are skipped. Rows where `participantId` doesn't exist in this sub-group are flagged as errors.
+## CSV formats unchanged
+Roster: `participantId, fullName, phone, roomTypePreference, feeOwed, amountPaid`
+Returned: same shape; only `participantId` and `amountPaid` are read.

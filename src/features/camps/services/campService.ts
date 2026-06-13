@@ -8,11 +8,28 @@ import {
   query,
   orderBy,
   Timestamp,
+  deleteField,
+  type FieldValue,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { Camp } from '../types'
 
 type CampInput = Omit<Camp, 'id' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'>
+
+// Firestore rejects undefined values — strip them before addDoc.
+function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))
+}
+
+// For updateDoc: replace undefined with deleteField() so cleared optional
+// fields (e.g. description cleared in the settings form) are actually removed.
+function undefinedToDelete(
+  obj: Record<string, unknown>,
+): Record<string, unknown | FieldValue> {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === undefined ? deleteField() : v]),
+  )
+}
 
 export async function listCamps(): Promise<Camp[]> {
   const q = query(collection(db, 'camps'), orderBy('startDate'))
@@ -29,7 +46,7 @@ export async function getCamp(id: string): Promise<Camp | null> {
 export async function createCamp(data: CampInput, uid: string): Promise<string> {
   const now = Timestamp.now()
   const ref = await addDoc(collection(db, 'camps'), {
-    ...data,
+    ...stripUndefined(data as Record<string, unknown>),
     createdAt: now,
     createdBy: uid,
     updatedAt: now,
@@ -43,7 +60,7 @@ export async function updateCamp(
   uid: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'camps', id), {
-    ...data,
+    ...undefinedToDelete(data as Record<string, unknown>),
     updatedAt: Timestamp.now(),
     updatedBy: uid,
   })

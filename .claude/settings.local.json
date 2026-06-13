@@ -5,7 +5,14 @@
       "Bash(firebase projects:list)",
       "Bash(firebase login *)",
       "Bash(firebase use *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(mkdir -p scripts && ls scripts/ 2>/dev/null || echo \"scripts dir created\")",
+      "Bash(node_modules/.bin/tsx scripts/seed-participants.ts)",
+      "Bash(node_modules/.bin/tsx scripts/seed-participants.ts --camp fake)"
+    ],
+    "additionalDirectories": [
+      "/Users/daviddagvanderpuije/dev/flstuff/camp-app"
     ]
   }
 }

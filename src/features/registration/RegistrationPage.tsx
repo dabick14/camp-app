@@ -54,11 +54,6 @@ const schema = z.object({
   gender: z.string().refine((v) => v === 'M' || v === 'F', 'Please select your gender'),
   dateOfBirth: z.string().optional(),
   age: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().refine(
-    (v) => !v.trim() || isValidGhanaPhone(v),
-    'Enter a valid Ghana number',
-  ),
   subGroupId: z.string().min(1, 'Please select a sub-group'),
   roomTypePreferenceId: z.string().min(1, 'Please select a room type'),
 })
@@ -70,8 +65,6 @@ type Schema = {
   gender: 'M' | 'F' | ''
   dateOfBirth: string
   age: string
-  emergencyContactName: string
-  emergencyContactPhone: string
   subGroupId: string
   roomTypePreferenceId: string
 }
@@ -174,7 +167,6 @@ export function RegistrationPage() {
     defaultValues: {
       fullName: '', phone: '', email: '', gender: '',
       dateOfBirth: '', age: '',
-      emergencyContactName: '', emergencyContactPhone: '',
       subGroupId: '', roomTypePreferenceId: '',
     },
   })
@@ -202,9 +194,6 @@ export function RegistrationPage() {
       if (values.email?.trim()) payload.email = values.email.trim()
       if (useDob && values.dateOfBirth) payload.dateOfBirth = values.dateOfBirth
       if (!useDob && values.age) payload.age = parseInt(values.age, 10)
-      if (values.emergencyContactName?.trim()) payload.emergencyContactName = values.emergencyContactName.trim()
-      if (values.emergencyContactPhone?.trim()) payload.emergencyContactPhone = normalizePhone(values.emergencyContactPhone)
-
       const res = await fetch(REGISTER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -351,18 +340,6 @@ export function RegistrationPage() {
             />
           )}
         </div>
-
-        <Field label="Emergency contact name" optional error={errors.emergencyContactName?.message}>
-          <Input {...register('emergencyContactName')} placeholder="Jane Doe" />
-        </Field>
-
-        <Field label="Emergency contact phone" optional error={errors.emergencyContactPhone?.message}>
-          <Input
-            {...register('emergencyContactPhone')}
-            placeholder="0244 123 456"
-            inputMode="tel"
-          />
-        </Field>
 
         {/* Sub-group — searchable combobox */}
         <div className="space-y-1.5">

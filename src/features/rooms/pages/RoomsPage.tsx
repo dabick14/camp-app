@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, PlusIcon, Trash2, UploadIcon } from 'lucide-react'
+import { PlusIcon, Trash2, UploadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,8 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { getCamp } from '@/features/camps/services/campService'
-import type { Camp } from '@/features/camps/types'
+import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { CsvImportModal } from '../components/CsvImportModal'
 import { RoomFormModal } from '../components/RoomFormModal'
 import { deleteRoom, listRooms } from '../services/roomService'
@@ -39,8 +38,10 @@ function naturalSort(rooms: Room[]): Room[] {
 
 export function RoomsPage() {
   const { id: campId } = useParams<{ id: string }>()
+  // Camp data comes from CampLayout context; rooms/roomTypes are managed locally
+  // because this page does CRUD on them and needs to re-fetch after mutations.
+  useCampData() // validates we're inside CampLayout
 
-  const [camp, setCamp] = useState<Camp | null>(null)
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,10 +57,9 @@ export function RoomsPage() {
   useEffect(() => {
     if (!campId) return
     let cancelled = false
-    Promise.all([getCamp(campId), listRoomTypes(campId), listRooms(campId)])
-      .then(([campData, types, roomsData]) => {
+    Promise.all([listRoomTypes(campId), listRooms(campId)])
+      .then(([types, roomsData]) => {
         if (cancelled) return
-        setCamp(campData)
         setRoomTypes(types)
         setRooms(roomsData)
         setLoading(false)
@@ -107,16 +107,7 @@ export function RoomsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      {/* breadcrumb */}
-      <Link
-        to={`/admin/camps/${campId}`}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        {camp?.name ?? 'Camp'}
-      </Link>
-
+    <div className="mx-auto max-w-5xl px-6 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Rooms</h1>
         <div className="flex gap-2">

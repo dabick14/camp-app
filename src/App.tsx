@@ -7,12 +7,22 @@ import { RegistrationPage } from '@/features/registration/RegistrationPage'
 import { ConfirmationPage } from '@/features/registration/ConfirmationPage'
 import { CampsListPage } from '@/features/camps/pages/CampsListPage'
 import { NewCampPage } from '@/features/camps/pages/NewCampPage'
-import { CampLandingPage } from '@/features/camps/pages/CampLandingPage'
 import { CampSettingsPage } from '@/features/camps/pages/CampSettingsPage'
 import { RoomsPage } from '@/features/rooms/pages/RoomsPage'
+import { CampLayout } from '@/features/camp-layout/CampLayout'
+import { ParticipantListPage } from '@/features/participants/ParticipantListPage'
+import { DashboardPage } from '@/features/dashboard/DashboardPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
+}
+
+function PaymentsPlaceholder() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+      Payments — coming in Day 5
+    </div>
+  )
 }
 
 export default function App() {
@@ -25,12 +35,27 @@ export default function App() {
           <Route path="/r/:campId" element={<RegistrationPage />} />
           <Route path="/r/:campId/done" element={<ConfirmationPage />} />
 
-          {/* Admin — all protected */}
-          <Route path="/admin/camps" element={<AdminRoute><CampsListPage /></AdminRoute>} />
-          <Route path="/admin/camps/new" element={<AdminRoute><NewCampPage /></AdminRoute>} />
-          <Route path="/admin/camps/:id" element={<AdminRoute><CampLandingPage /></AdminRoute>} />
-          <Route path="/admin/camps/:id/settings" element={<AdminRoute><CampSettingsPage /></AdminRoute>} />
-          <Route path="/admin/camps/:id/rooms" element={<AdminRoute><RoomsPage /></AdminRoute>} />
+          {/* Admin — list + new camp */}
+          <Route
+            path="/admin/camps"
+            element={<AdminRoute><CampsListPage /></AdminRoute>}
+          />
+          <Route
+            path="/admin/camps/new"
+            element={<AdminRoute><NewCampPage /></AdminRoute>}
+          />
+
+          {/* Per-camp — all wrapped by CampLayout */}
+          <Route
+            path="/admin/camps/:id"
+            element={<AdminRoute><CampLayout /></AdminRoute>}
+          >
+            <Route index element={<ParticipantListPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="rooms" element={<RoomsPage />} />
+            <Route path="payments" element={<PaymentsPlaceholder />} />
+            <Route path="settings" element={<CampSettingsPage />} />
+          </Route>
 
           {/* Fallbacks */}
           <Route path="/admin" element={<Navigate to="/admin/camps" replace />} />

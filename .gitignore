@@ -27,3 +27,9 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Firebase service account keys — never commit these
+service-account-key.json
+*-service-account*.json
+*-serviceaccount*.json
+firebase-adminsdk-*.json

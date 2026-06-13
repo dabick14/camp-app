@@ -9,7 +9,7 @@ const db = (0, firestore_1.getFirestore)();
 // HTTP function — cors: true handles the OPTIONS preflight via cors middleware
 // before any function code runs, which is more reliable than onCall's built-in handling.
 exports.registerParticipant = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
-    var _a, _b, _c, _d;
+    var _a, _b;
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
@@ -74,10 +74,6 @@ exports.registerParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
         }
         if (data.age != null)
             participant.age = data.age;
-        if ((_b = data.emergencyContactName) === null || _b === void 0 ? void 0 : _b.trim())
-            participant.emergencyContactName = data.emergencyContactName.trim();
-        if ((_c = data.emergencyContactPhone) === null || _c === void 0 ? void 0 : _c.trim())
-            participant.emergencyContactPhone = data.emergencyContactPhone.trim();
         const ref = await db.collection(`camps/${campId}/participants`).add(participant);
         res.json({
             participantId: ref.id,
@@ -85,7 +81,7 @@ exports.registerParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
             subGroupName,
             roomTypePreferenceName,
             feeOwed,
-            currency: (_d = camp.currency) !== null && _d !== void 0 ? _d : 'GHS',
+            currency: (_b = camp.currency) !== null && _b !== void 0 ? _b : 'GHS',
             campName: camp.name,
         });
     }

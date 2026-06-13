@@ -13,8 +13,6 @@ interface RegisterParticipantData {
   gender: string
   dateOfBirth?: string   // YYYY-MM-DD
   age?: number
-  emergencyContactName?: string
-  emergencyContactPhone?: string
   subGroupId: string
   roomTypePreferenceId: string
 }
@@ -92,8 +90,6 @@ export const registerParticipant = onRequest({ cors: true }, async (req, res) =>
       participant.dateOfBirth = Timestamp.fromDate(new Date(`${data.dateOfBirth}T12:00:00Z`))
     }
     if (data.age != null) participant.age = data.age
-    if (data.emergencyContactName?.trim()) participant.emergencyContactName = data.emergencyContactName.trim()
-    if (data.emergencyContactPhone?.trim()) participant.emergencyContactPhone = data.emergencyContactPhone.trim()
 
     const ref = await db.collection(`camps/${campId}/participants`).add(participant)
 
