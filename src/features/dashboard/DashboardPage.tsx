@@ -7,6 +7,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
+import { formatMoney } from '@/lib/formatMoney'
 
 function BigMetric({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
@@ -54,12 +55,12 @@ export function DashboardPage() {
   const bySubGroup = useMemo(() => {
     const map = new Map<string, {
       name: string; registered: number; paid: number; partial: number;
-      pending: number; roomed: number; totalExpected: number; totalReceived: number
+      pending: number; waived: number; roomed: number; totalExpected: number; totalReceived: number
     }>()
     for (const sg of subGroups) {
       map.set(sg.id, {
         name: sg.name, registered: 0, paid: 0, partial: 0,
-        pending: 0, roomed: 0, totalExpected: 0, totalReceived: 0,
+        pending: 0, waived: 0, roomed: 0, totalExpected: 0, totalReceived: 0,
       })
     }
     for (const p of active) {
@@ -70,6 +71,7 @@ export function DashboardPage() {
       if (ps === 'PAID') row.paid++
       else if (ps === 'PARTIAL') row.partial++
       else if (ps === 'PENDING') row.pending++
+      else if (ps === 'WAIVED') row.waived++
       if (p.roomId) row.roomed++
       row.totalExpected += p.feeOwed
       row.totalReceived += p.amountPaid
@@ -143,6 +145,7 @@ export function DashboardPage() {
                   <TableHead className="text-right">Paid</TableHead>
                   <TableHead className="text-right">Partial</TableHead>
                   <TableHead className="text-right">Pending</TableHead>
+                  <TableHead className="text-right">Waived</TableHead>
                   <TableHead className="text-right">Roomed</TableHead>
                   <TableHead className="text-right">Expected ({currency})</TableHead>
                   <TableHead className="text-right">Received ({currency})</TableHead>
@@ -151,7 +154,7 @@ export function DashboardPage() {
               <TableBody>
                 {bySubGroup.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No sub-groups
                     </TableCell>
                   </TableRow>
@@ -163,12 +166,13 @@ export function DashboardPage() {
                       <TableCell className="text-right text-emerald-600">{row.paid}</TableCell>
                       <TableCell className="text-right text-amber-600">{row.partial}</TableCell>
                       <TableCell className="text-right text-red-600">{row.pending}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{row.waived}</TableCell>
                       <TableCell className="text-right">{row.roomed}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.totalExpected.toLocaleString()}
+                        {formatMoney(row.totalExpected, currency)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.totalReceived.toLocaleString()}
+                        {formatMoney(row.totalReceived, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -206,7 +210,7 @@ export function DashboardPage() {
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{row.name}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.price.toLocaleString()}
+                        {formatMoney(row.price, currency)}
                       </TableCell>
                       <TableCell className="text-right">{row.preferredBy}</TableCell>
                       <TableCell className="text-right">{row.capacityTotal}</TableCell>

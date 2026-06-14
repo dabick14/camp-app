@@ -49,6 +49,34 @@ exports.registerParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
         const roomTypeData = roomTypeSnap.data();
         const roomTypePreferenceName = roomTypeData.name;
         const feeOwed = roomTypeData.price;
+        // Age gate (server-side enforcement — mirrors client-side check)
+        if (camp.minAge != null || camp.maxAge != null) {
+            let computedAge = null;
+            if (data.dateOfBirth) {
+                const dob = new Date(`${data.dateOfBirth}T12:00:00Z`);
+                const campStart = camp.startDate.toDate();
+                computedAge = Math.floor((campStart.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            }
+            else if (data.age != null) {
+                computedAge = data.age;
+            }
+            if (computedAge !== null) {
+                if (camp.minAge != null && computedAge < camp.minAge) {
+                    res.status(400).json({
+                        error: 'AGE_BELOW_MIN',
+                        message: `This camp has a minimum age of ${camp.minAge}. Please contact the organizers if this is an error.`,
+                    });
+                    return;
+                }
+                if (camp.maxAge != null && computedAge > camp.maxAge) {
+                    res.status(400).json({
+                        error: 'AGE_EXCEEDED',
+                        message: `This camp has a maximum age of ${camp.maxAge}. Please contact the organizers if this is an error.`,
+                    });
+                    return;
+                }
+            }
+        }
         const participant = {
             fullName: fullName.trim(),
             phone: phone.trim(),

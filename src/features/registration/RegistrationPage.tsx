@@ -7,6 +7,7 @@ import { Check, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatMoney } from '@/lib/formatMoney'
 import { getCamp } from '@/features/camps/services/campService'
 import { listSubGroups } from '@/features/camps/services/subGroupService'
 import { listRoomTypes } from '@/features/rooms/services/roomTypeService'
@@ -37,6 +38,14 @@ function normalizePhone(v: string): string {
   if (s.startsWith('0')) return '+233' + s.slice(1)
   if (s.startsWith('233')) return '+' + s
   return s // already +233…
+}
+
+// ─── age helper ───────────────────────────────────────────────────────────────
+
+function computeAgeFromDob(dobStr: string, refDate: Date): number | null {
+  const dob = new Date(dobStr)
+  if (isNaN(dob.getTime())) return null
+  return Math.floor((refDate.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
 }
 
 // ─── schema ───────────────────────────────────────────────────────────────────
@@ -160,10 +169,12 @@ export function RegistrationPage() {
     handleSubmit,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<Schema>({
     resolver: zodResolver(schema) as Resolver<Schema>,
-    mode: 'onTouched', // validate on blur after first touch, then on change
+    mode: 'onTouched',
     defaultValues: {
       fullName: '', phone: '', email: '', gender: '',
       dateOfBirth: '', age: '',
@@ -174,6 +185,38 @@ export function RegistrationPage() {
   const gender = watch('gender')
   const selectedSubGroupId = watch('subGroupId')
   const selectedRoomTypeId = watch('roomTypePreferenceId')
+  const watchedDob = watch('dateOfBirth')
+  const watchedAge = watch('age')
+
+  // Real-time age gate: fires whenever DOB/age field or camp changes
+  useEffect(() => {
+    if (!camp || (camp.minAge == null && camp.maxAge == null)) return
+    const field = useDob ? 'dateOfBirth' as const : 'age' as const
+
+    let computedAge: number | null = null
+    if (useDob && watchedDob) {
+      computedAge = computeAgeFromDob(watchedDob, camp.startDate.toDate())
+    } else if (!useDob && watchedAge) {
+      const n = parseInt(watchedAge, 10)
+      if (!isNaN(n)) computedAge = n
+    }
+
+    if (computedAge === null) { clearErrors([field]); return }
+
+    if (camp.minAge != null && computedAge < camp.minAge) {
+      setError(field, {
+        type: 'manual',
+        message: `This camp has a minimum age of ${camp.minAge}. Please contact the organizers if this is an error.`,
+      })
+    } else if (camp.maxAge != null && computedAge > camp.maxAge) {
+      setError(field, {
+        type: 'manual',
+        message: `This camp has a maximum age of ${camp.maxAge}. Please contact the organizers if this is an error.`,
+      })
+    } else {
+      clearErrors([field])
+    }
+  }, [watchedDob, watchedAge, useDob, camp])
 
   const selectedSubGroup = subGroups.find((sg) => sg.id === selectedSubGroupId)
   const filteredSubGroups = subGroups.filter((sg) =>
@@ -182,6 +225,29 @@ export function RegistrationPage() {
 
   async function onSubmit(values: Schema) {
     setSubmitError('')
+
+    // Age gate (last-resort check before network — real-time useEffect is primary)
+    if (camp && (camp.minAge != null || camp.maxAge != null)) {
+      let computedAge: number | null = null
+      if (useDob && values.dateOfBirth) {
+        computedAge = computeAgeFromDob(values.dateOfBirth, camp.startDate.toDate())
+      } else if (!useDob && values.age) {
+        const n = parseInt(values.age, 10)
+        if (!isNaN(n)) computedAge = n
+      }
+      if (computedAge !== null) {
+        const field = useDob ? 'dateOfBirth' as const : 'age' as const
+        if (camp.minAge != null && computedAge < camp.minAge) {
+          setError(field, { type: 'manual', message: `This camp has a minimum age of ${camp.minAge}. Please contact the organizers if this is an error.` })
+          return
+        }
+        if (camp.maxAge != null && computedAge > camp.maxAge) {
+          setError(field, { type: 'manual', message: `This camp has a maximum age of ${camp.maxAge}. Please contact the organizers if this is an error.` })
+          return
+        }
+      }
+    }
+
     try {
       const payload: Record<string, unknown> = {
         campId,
@@ -200,7 +266,7 @@ export function RegistrationPage() {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Registration failed. Please try again.')
+      if (!res.ok) throw new Error(data.message ?? data.error ?? 'Registration failed. Please try again.')
 
       navigate(`/r/${campId}/done`, {
         state: {
@@ -433,7 +499,7 @@ export function RegistrationPage() {
                 />
                 <span className="flex-1">{rt.name}</span>
                 <span className="text-muted-foreground">
-                  {camp?.currency ?? 'GHS'} {rt.price.toLocaleString()}
+                  {formatMoney(rt.price, camp?.currency ?? 'GHS')}
                 </span>
               </label>
             ))}

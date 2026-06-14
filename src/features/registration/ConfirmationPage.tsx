@@ -1,5 +1,6 @@
 import { useLocation, useParams } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
+import { formatMoney } from '@/lib/formatMoney'
 
 interface ConfirmationState {
   participantId: string
@@ -42,7 +43,7 @@ export function ConfirmationPage() {
         <Row label="Room preference" value={state.roomTypePreferenceName} />
         <Row
           label="Fee owed"
-          value={`${state.currency} ${state.feeOwed.toLocaleString()}`}
+          value={formatMoney(state.feeOwed, state.currency)}
           highlight
         />
       </div>

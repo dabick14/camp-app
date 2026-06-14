@@ -4,6 +4,7 @@ import { Timestamp } from 'firebase/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { formatMoney } from '@/lib/formatMoney'
 import {
   createRoomType,
   listRoomTypes,
@@ -11,6 +12,14 @@ import {
   updateRoomType,
 } from '../services/roomTypeService'
 import type { RoomType } from '../types'
+
+function validatePrice(raw: string | number): string | null {
+  const s = String(raw).trim()
+  if (s === '' || isNaN(Number(s))) return 'Price is required'
+  if (Number(s) < 0) return 'Price must be 0 or more'
+  if (/\.\d{3,}/.test(s)) return 'Maximum 2 decimal places'
+  return null
+}
 
 interface EditState {
   id: string
@@ -54,7 +63,8 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
     const price = Number(editing.price)
     const cap = Number(editing.defaultCapacity)
     if (!name) { setError('Name is required'); return }
-    if (!price || price < 0) { setError('Price must be 0 or more'); return }
+    const priceErr = validatePrice(editing.price)
+    if (priceErr) { setError(priceErr); return }
     if (!cap || cap < 1) { setError('Capacity must be at least 1'); return }
     setError('')
     setSaving(true)
@@ -89,7 +99,8 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
     const price = Number(newPrice)
     const cap = Number(newCapacity)
     if (!name) { setError('Name is required'); return }
-    if (newPrice === '' || isNaN(price) || price < 0) { setError('Price must be 0 or more'); return }
+    const priceErr = validatePrice(newPrice)
+    if (priceErr) { setError(priceErr); return }
     if (!cap || cap < 1) { setError('Default capacity must be at least 1'); return }
     setError('')
     setSaving(true)
@@ -138,6 +149,7 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={editing.price}
                   onChange={(e) => setEditing({ ...editing, price: e.target.value === '' ? '' : Number(e.target.value) })}
                   placeholder="Price"
@@ -166,7 +178,7 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
               /* ── display row ── */
               <div className="flex flex-1 items-center gap-4 text-sm">
                 <span className="min-w-0 flex-1 font-medium">{rt.name}</span>
-                <span className="shrink-0 text-muted-foreground">{currency} {rt.price}</span>
+                <span className="shrink-0 text-muted-foreground">{formatMoney(rt.price, currency)}</span>
                 <span className="shrink-0 text-muted-foreground">cap {rt.defaultCapacity}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {rt.allowOverbook ? 'overbook ✓' : 'hard cap'}
@@ -199,7 +211,7 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Price ({currency})</label>
-          <Input type="number" min={0} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0" className="h-8 w-24 text-sm" />
+          <Input type="number" min={0} step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0.00" className="h-8 w-24 text-sm" />
         </div>
         <div className="space-y-1">
           <label className="text-xs text-muted-foreground">Default capacity</label>

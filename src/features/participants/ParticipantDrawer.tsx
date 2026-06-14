@@ -3,6 +3,7 @@ import type { Timestamp } from 'firebase/firestore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { formatMoney } from '@/lib/formatMoney'
 import { type Participant, type PaymentState, derivePaymentState } from './types'
 
 function fmtDate(ts: Timestamp | undefined): string {
@@ -137,18 +138,18 @@ export function ParticipantDrawer({
                 </p>
                 <Row
                   label="Fee owed"
-                  value={`${currency} ${p.feeOwed.toLocaleString()}`}
+                  value={formatMoney(p.feeOwed, currency)}
                 />
                 <Row
                   label="Amount paid"
-                  value={`${currency} ${p.amountPaid.toLocaleString()}`}
+                  value={formatMoney(p.amountPaid, currency)}
                 />
                 {p.feeOwed > 0 && p.amountPaid < p.feeOwed && (
                   <Row
                     label="Balance due"
                     value={
                       <span className="font-medium text-destructive">
-                        {currency} {(p.feeOwed - p.amountPaid).toLocaleString()}
+                        {formatMoney(p.feeOwed - p.amountPaid, currency)}
                       </span>
                     }
                   />
@@ -158,7 +159,7 @@ export function ParticipantDrawer({
                     label="Credit"
                     value={
                       <span className="font-medium text-emerald-600">
-                        {currency} {(p.amountPaid - p.feeOwed).toLocaleString()}
+                        {formatMoney(p.amountPaid - p.feeOwed, currency)}
                       </span>
                     }
                   />
