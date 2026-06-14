@@ -96,6 +96,12 @@ export function RegistrationPage() {
   const [useDob, setUseDob] = useState(true)
   const [submitError, setSubmitError] = useState('')
 
+  // Fix #3 — scroll focused input into view after keyboard appears on mobile
+  function scrollToFocused(e: React.FocusEvent<HTMLElement>) {
+    const el = e.target
+    setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
+  }
+
   // Duplicate UX state
   const [softDup, setSoftDup] = useState<{ type: string; message: string } | null>(null)
   const acknowledgedDupsRef = useRef<string[]>([])
@@ -225,6 +231,9 @@ export function RegistrationPage() {
       }
     }
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15_000)
+
     try {
       const payload: Record<string, unknown> = {
         campId,
@@ -243,7 +252,9 @@ export function RegistrationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
       const data = await res.json()
 
       if (!res.ok) {
@@ -269,7 +280,15 @@ export function RegistrationPage() {
         },
       })
     } catch (err: unknown) {
-      setSubmitError((err as { message?: string })?.message ?? 'Submission failed. Please try again.')
+      clearTimeout(timeoutId)
+      const isConnectError =
+        err instanceof TypeError ||
+        (err as { name?: string })?.name === 'AbortError'
+      setSubmitError(
+        isConnectError
+          ? "⚠️ Couldn't connect. Check your internet connection and try again."
+          : ((err as { message?: string })?.message ?? 'Submission failed. Please try again.'),
+      )
     }
   }
 
@@ -330,7 +349,7 @@ export function RegistrationPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
 
         <Field label="Full name" required error={errors.fullName?.message}>
-          <Input {...register('fullName')} placeholder="John Doe" autoComplete="name" />
+          <Input {...register('fullName')} placeholder="John Doe" autoComplete="name" onFocus={scrollToFocused} />
         </Field>
 
         <Field label="Phone number" required error={errors.phone?.message}>
@@ -339,6 +358,7 @@ export function RegistrationPage() {
             placeholder="0244 123 456"
             inputMode="tel"
             autoComplete="tel"
+            onFocus={scrollToFocused}
           />
         </Field>
 
@@ -348,6 +368,7 @@ export function RegistrationPage() {
             placeholder="you@example.com"
             inputMode="email"
             autoComplete="email"
+            onFocus={scrollToFocused}
           />
         </Field>
 
@@ -394,7 +415,7 @@ export function RegistrationPage() {
             </button>
           </div>
           {useDob ? (
-            <Input type="date" {...register('dateOfBirth')} />
+            <Input type="date" {...register('dateOfBirth')} onFocus={scrollToFocused} />
           ) : (
             <Input
               type="number"
@@ -403,6 +424,7 @@ export function RegistrationPage() {
               inputMode="numeric"
               placeholder="e.g. 22"
               {...register('age')}
+              onFocus={scrollToFocused}
             />
           )}
           {useDob && errors.dateOfBirth && (
@@ -442,7 +464,8 @@ export function RegistrationPage() {
                     value={sgSearch}
                     onChange={(e) => setSgSearch(e.target.value)}
                     placeholder="Search…"
-                    className="h-8 text-sm"
+                    className="h-8"
+                    onFocus={scrollToFocused}
                   />
                 </div>
                 <ul className="max-h-52 overflow-y-auto py-1">
