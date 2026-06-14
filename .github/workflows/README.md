@@ -13,7 +13,7 @@
 
 ## Required GitHub Secrets
 
-Go to **Settings → Secrets and variables → Actions → New repository secret** and add all of the following.
+Secrets are stored in the **`production` environment** (Settings → Environments → production → Environment secrets). Both deploy jobs declare `environment: production` so they can access them.
 
 ### Firebase service account (used by both jobs)
 
