@@ -22,6 +22,8 @@ export interface Participant {
   amountPaid: number
   checkedInBy?: string
   checkedInAt?: Timestamp
+  tags: string[]
+  feeWaiverNote?: string
   notes?: string
   createdAt: Timestamp
   updatedAt: Timestamp

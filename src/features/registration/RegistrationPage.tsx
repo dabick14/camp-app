@@ -14,39 +14,13 @@ import { listRoomTypes } from '@/features/rooms/services/roomTypeService'
 import type { Camp } from '@/features/camps/types'
 import type { SubGroup } from '@/features/camps/types'
 import type { RoomType } from '@/features/rooms/types'
+import {
+  isValidGhanaPhone,
+  normalizePhone,
+  computeAgeFromDob,
+} from './utils'
 
 const REGISTER_URL = 'https://us-central1-camp-app-119bb.cloudfunctions.net/registerParticipant'
-
-// ─── phone helpers ────────────────────────────────────────────────────────────
-
-function stripPhone(v: string) {
-  // ​-\u200F and \u202A-\u202E are invisible Unicode directional/formatting
-  // chars that iOS/Android paste into numbers copied from the contacts app
-  return v.replace(/[​-\u200F\u202A-\u202E﻿\s\-()]/g, '')
-}
-
-function isValidGhanaPhone(v: string): boolean {
-  const s = stripPhone(v)
-  // local: 0 + [2357] + 8 digits (mobile), or 0 + [23] + [2-9] + 7 digits (landline)
-  const local = /^0[2357]\d{8}$/.test(s) || /^0[23][2-9]\d{7}$/.test(s)
-  const intl = /^233\d{9}$/.test(s) || /^\+233\d{9}$/.test(s)
-  return local || intl
-}
-
-function normalizePhone(v: string): string {
-  const s = stripPhone(v)
-  if (s.startsWith('0')) return '+233' + s.slice(1)
-  if (s.startsWith('233')) return '+' + s
-  return s // already +233…
-}
-
-// ─── age helper ───────────────────────────────────────────────────────────────
-
-function computeAgeFromDob(dobStr: string, refDate: Date): number | null {
-  const dob = new Date(dobStr)
-  if (isNaN(dob.getTime())) return null
-  return Math.floor((refDate.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-}
 
 // ─── schema ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +96,10 @@ export function RegistrationPage() {
   const [useDob, setUseDob] = useState(true)
   const [submitError, setSubmitError] = useState('')
 
+  // Duplicate UX state
+  const [softDup, setSoftDup] = useState<{ type: string; message: string } | null>(null)
+  const acknowledgedDupsRef = useRef<string[]>([])
+
   // ─── sub-group combobox state ───────────────────────────────────────────────
   const [sgSearch, setSgSearch] = useState('')
   const [sgOpen, setSgOpen] = useState(false)
@@ -146,7 +124,6 @@ export function RegistrationPage() {
     Promise.all([getCamp(campId), listSubGroups(campId), listRoomTypes(campId)])
       .then(([campData, groups, types]) => {
         if (cancelled) return
-        // BUG 1: explicit registrationOpen check — doesn't rely on security rules alone
         if (!campData) { setPageStatus('notFound'); return }
         if (!campData.registrationOpen) { setPageStatus('closed'); return }
         setCamp(campData)
@@ -156,7 +133,6 @@ export function RegistrationPage() {
       })
       .catch((err: { code?: string }) => {
         if (cancelled) return
-        // BUG 2: differentiate closed (permission-denied on a real doc) vs not found
         setPageStatus(err?.code === 'permission-denied' ? 'closed' : 'error')
       })
 
@@ -188,7 +164,7 @@ export function RegistrationPage() {
   const watchedDob = watch('dateOfBirth')
   const watchedAge = watch('age')
 
-  // Real-time age gate: fires whenever DOB/age field or camp changes
+  // Real-time age gate
   useEffect(() => {
     if (!camp || (camp.minAge == null && camp.maxAge == null)) return
     const field = useDob ? 'dateOfBirth' as const : 'age' as const
@@ -225,8 +201,9 @@ export function RegistrationPage() {
 
   async function onSubmit(values: Schema) {
     setSubmitError('')
+    setSoftDup(null)
 
-    // Age gate (last-resort check before network — real-time useEffect is primary)
+    // Age gate (submit-time safety net)
     if (camp && (camp.minAge != null || camp.maxAge != null)) {
       let computedAge: number | null = null
       if (useDob && values.dateOfBirth) {
@@ -256,17 +233,29 @@ export function RegistrationPage() {
         gender: values.gender,
         subGroupId: values.subGroupId,
         roomTypePreferenceId: values.roomTypePreferenceId,
+        acknowledgedDuplicates: acknowledgedDupsRef.current,
       }
       if (values.email?.trim()) payload.email = values.email.trim()
       if (useDob && values.dateOfBirth) payload.dateOfBirth = values.dateOfBirth
       if (!useDob && values.age) payload.age = parseInt(values.age, 10)
+
       const res = await fetch(REGISTER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message ?? data.error ?? 'Registration failed. Please try again.')
+
+      if (!res.ok) {
+        if (
+          res.status === 409 &&
+          (data.error === 'DUPLICATE_NAME_DOB' || data.error === 'DUPLICATE_EMAIL')
+        ) {
+          setSoftDup({ type: data.error as string, message: data.message })
+          return
+        }
+        throw new Error(data.message ?? data.error ?? 'Registration failed. Please try again.')
+      }
 
       navigate(`/r/${campId}/done`, {
         state: {
@@ -282,6 +271,13 @@ export function RegistrationPage() {
     } catch (err: unknown) {
       setSubmitError((err as { message?: string })?.message ?? 'Submission failed. Please try again.')
     }
+  }
+
+  function acknowledgeAndResubmit() {
+    if (!softDup) return
+    acknowledgedDupsRef.current = [...acknowledgedDupsRef.current, softDup.type]
+    setSoftDup(null)
+    handleSubmit(onSubmit)()
   }
 
   // ─── status screens ──────────────────────────────────────────────────────────
@@ -388,7 +384,11 @@ export function RegistrationPage() {
             <button
               type="button"
               className="text-xs text-muted-foreground underline underline-offset-2"
-              onClick={() => { setUseDob(!useDob); setValue('dateOfBirth', ''); setValue('age', '') }}
+              onClick={() => {
+                setUseDob(!useDob)
+                setValue('dateOfBirth', '')
+                setValue('age', '')
+              }}
             >
               {useDob ? 'I only know my age' : 'I know my date of birth'}
             </button>
@@ -404,6 +404,12 @@ export function RegistrationPage() {
               placeholder="e.g. 22"
               {...register('age')}
             />
+          )}
+          {useDob && errors.dateOfBirth && (
+            <p className="text-sm text-destructive">{errors.dateOfBirth.message}</p>
+          )}
+          {!useDob && errors.age && (
+            <p className="text-sm text-destructive">{errors.age.message}</p>
           )}
         </div>
 
@@ -430,7 +436,7 @@ export function RegistrationPage() {
 
             {sgOpen && (
               <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-lg">
-                <div className="p-1.5 border-b">
+                <div className="border-b p-1.5">
                   <Input
                     autoFocus
                     value={sgSearch}
@@ -508,6 +514,34 @@ export function RegistrationPage() {
             <p className="text-sm text-destructive">{errors.roomTypePreferenceId.message}</p>
           )}
         </div>
+
+        {/* Soft duplicate warning */}
+        {softDup && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="mb-2">{softDup.message}</p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={acknowledgeAndResubmit}
+                className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                disabled={isSubmitting}
+              >
+                Register anyway
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSoftDup(null)}
+                className="text-amber-800 hover:bg-amber-100"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         {submitError && (
           <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -9,10 +9,14 @@
       "Bash(npm install *)",
       "Bash(mkdir -p scripts && ls scripts/ 2>/dev/null || echo \"scripts dir created\")",
       "Bash(node_modules/.bin/tsx scripts/seed-participants.ts)",
-      "Bash(node_modules/.bin/tsx scripts/seed-participants.ts --camp fake)"
+      "Bash(node_modules/.bin/tsx scripts/seed-participants.ts --camp fake)",
+      "Bash(npx tsc *)",
+      "Bash(mkdir -p /Users/daviddagvanderpuije/dev/flstuff/camp-app/.github/workflows)",
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=./service-account-key.json node_modules/.bin/tsx scripts/seed-participants.ts --clean --camp H3cmW6ZBg4fzQnyhycGq --yes)"
     ],
     "additionalDirectories": [
-      "/Users/daviddagvanderpuije/dev/flstuff/camp-app"
+      "/Users/daviddagvanderpuije/dev/flstuff/camp-app",
+      "/Users/daviddagvanderpuije/dev/flstuff/camp-app/.github"
     ]
   }
 }

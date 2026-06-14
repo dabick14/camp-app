@@ -68,8 +68,8 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function roundToNearest50(n: number): number {
-  return Math.round(n / 50) * 50;
+function roundToCents(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 function randomTimestampWithinDays(days: number): Timestamp {
@@ -128,6 +128,7 @@ function pickPaymentTier(index: number): PaymentTier {
   return 'WAIVED';
 }
 
+// feeOwed is pre-computed with random pesewas so it's always a Firestore double.
 function amountsForTier(
   tier: PaymentTier,
   feeOwed: number,
@@ -138,9 +139,9 @@ function amountsForTier(
 
     case 'PARTIAL': {
       const pct = randInt(25, 75) / 100;
-      const raw = roundToNearest50(feeOwed * pct);
+      const raw = roundToCents(feeOwed * pct);
       // Clamp so it's always > 0 and < feeOwed
-      const amountPaid = Math.max(50, Math.min(raw, feeOwed - 50));
+      const amountPaid = Math.max(0.50, Math.min(raw, roundToCents(feeOwed - 0.50)));
       return { feeOwed, amountPaid };
     }
 
@@ -148,7 +149,8 @@ function amountsForTier(
       return { feeOwed, amountPaid: feeOwed };
 
     case 'OVERPAID':
-      return { feeOwed, amountPaid: feeOwed + randInt(1, 4) * 50 };
+      // Small random overpayment in GHS 0.25 increments
+      return { feeOwed, amountPaid: roundToCents(feeOwed + randInt(1, 40) * 0.25) };
 
     case 'WAIVED':
       return { feeOwed: 0, amountPaid: 0 };
@@ -290,7 +292,9 @@ async function runSeed(campId: string, campName: string): Promise<void> {
     const roomType = roomTypes[i % roomTypes.length];
 
     const tier = pickPaymentTier(i);
-    const { feeOwed, amountPaid } = amountsForTier(tier, roomType.price);
+    // Add random pesewas (1–99) to the base price so Firestore stores as double, not integer.
+    const feeOwedBase = roundToCents(roomType.price + randInt(1, 99) / 100);
+    const { feeOwed, amountPaid } = amountsForTier(tier, feeOwedBase);
 
     const derived = derivePaymentState(feeOwed, amountPaid);
     tally[derived]++;

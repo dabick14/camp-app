@@ -1,21 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { type Participant, type PaymentState, derivePaymentState } from './types'
-import { ParticipantDrawer } from './ParticipantDrawer'
+import { DetailDrawer } from './components/DetailDrawer'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 type SortField = 'name' | 'subGroup' | 'feeStatus'
 
 const PAYMENT_STATE_ORDER: Record<PaymentState, number> = {
-  PAID: 0, WAIVED: 1, PARTIAL: 2, PENDING: 3,
+  PAID: 0,
+  WAIVED: 1,
+  PARTIAL: 2,
+  PENDING: 3,
 }
 
 const PAYMENT_BADGE: Record<PaymentState, string> = {
@@ -126,13 +135,7 @@ function SortableHead({
   )
 }
 
-function FeeStatusCell({
-  p,
-  currency,
-}: {
-  p: Participant
-  currency: string
-}) {
+function FeeStatusCell({ p, currency }: { p: Participant; currency: string }) {
   const ps = derivePaymentState(p)
   return (
     <div className="flex items-center gap-2">
@@ -146,17 +149,61 @@ function FeeStatusCell({
   )
 }
 
+function TagsCell({ tags }: { tags: string[] }) {
+  const visible = tags.slice(0, 2)
+  const extra = tags.length - 2
+  if (tags.length === 0) return <span className="text-xs text-muted-foreground">—</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visible.map((tag) => (
+        <span
+          key={tag}
+          className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
+        >
+          {tag}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+          +{extra}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function ParticipantListPage() {
-  const { camp, participants, subGroups, roomTypes, loading } = useCampData()
+  const { camp, participants, subGroups, roomTypes, loading, refresh } = useCampData()
   const currency = camp?.currency ?? 'GHS'
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // ─── auto-open from navigation state (after admin add) ──────────────────────
+  const [autoOpenId] = useState<string | null>(
+    () => (location.state as { autoOpenId?: string } | null)?.autoOpenId ?? null,
+  )
+  useEffect(() => {
+    if (autoOpenId) {
+      refresh()
+      navigate('.', { replace: true, state: {} })
+    }
+    // Run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (autoOpenId && participants.some((p) => p.id === autoOpenId)) {
+      setSelectedId(autoOpenId)
+    }
+  }, [participants, autoOpenId])
 
   // ─── filter state ───────────────────────────────────────────────────────────
   const [filterSubGroups, setFilterSubGroups] = useState<string[]>([])
   const [filterPaymentStates, setFilterPaymentStates] = useState<PaymentState[]>([])
   const [filterCheckInStates, setFilterCheckInStates] = useState<string[]>([])
   const [filterRoomTypes, setFilterRoomTypes] = useState<string[]>([])
+  const [filterTags, setFilterTags] = useState<string[]>([])
   const [hasRoom, setHasRoom] = useState<'all' | 'assigned' | 'unassigned'>('all')
   const [showCancelled, setShowCancelled] = useState(false)
 
@@ -179,7 +226,10 @@ export function ParticipantListPage() {
 
   function handleSort(field: SortField) {
     if (sortBy === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setSortBy(field); setSortDir('asc') }
+    else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
     setPage(1)
   }
 
@@ -188,6 +238,7 @@ export function ParticipantListPage() {
     setFilterPaymentStates([])
     setFilterCheckInStates([])
     setFilterRoomTypes([])
+    setFilterTags([])
     setHasRoom('all')
     setSearchRaw('')
     setPage(1)
@@ -198,6 +249,7 @@ export function ParticipantListPage() {
     filterPaymentStates.length > 0 ||
     filterCheckInStates.length > 0 ||
     filterRoomTypes.length > 0 ||
+    filterTags.length > 0 ||
     hasRoom !== 'all' ||
     searchRaw !== ''
 
@@ -220,6 +272,12 @@ export function ParticipantListPage() {
     if (filterRoomTypes.length > 0) {
       list = list.filter((p) => filterRoomTypes.includes(p.roomTypePreferenceId))
     }
+    if (filterTags.length > 0) {
+      // ALL selected tags must be present (AND logic)
+      list = list.filter((p) =>
+        filterTags.every((tag) => (p.tags ?? []).includes(tag)),
+      )
+    }
     if (hasRoom === 'assigned') {
       list = list.filter((p) => p.roomId)
     } else if (hasRoom === 'unassigned') {
@@ -240,22 +298,34 @@ export function ParticipantListPage() {
       if (sortBy === 'name') cmp = a.fullName.localeCompare(b.fullName)
       else if (sortBy === 'subGroup') cmp = a.subGroupName.localeCompare(b.subGroupName)
       else if (sortBy === 'feeStatus') {
-        cmp = PAYMENT_STATE_ORDER[derivePaymentState(a)] - PAYMENT_STATE_ORDER[derivePaymentState(b)]
+        cmp =
+          PAYMENT_STATE_ORDER[derivePaymentState(a)] -
+          PAYMENT_STATE_ORDER[derivePaymentState(b)]
         if (cmp === 0) cmp = a.fullName.localeCompare(b.fullName)
       }
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [
-    participants, showCancelled,
-    filterSubGroups, filterPaymentStates, filterCheckInStates, filterRoomTypes,
-    hasRoom, searchDebounced, sortBy, sortDir,
+    participants,
+    showCancelled,
+    filterSubGroups,
+    filterPaymentStates,
+    filterCheckInStates,
+    filterRoomTypes,
+    filterTags,
+    hasRoom,
+    searchDebounced,
+    sortBy,
+    sortDir,
   ])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageSlice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1) }, [filtered.length, searchDebounced])
+  useEffect(() => {
+    setPage(1)
+  }, [filtered.length, searchDebounced])
 
   // ─── filter options ─────────────────────────────────────────────────────────
   const sgOptions = subGroups.map((sg) => ({ value: sg.id, label: sg.name }))
@@ -270,93 +340,134 @@ export function ParticipantListPage() {
     { value: 'NOT_ARRIVED', label: 'Not arrived' },
     { value: 'ARRIVED', label: 'Arrived' },
   ]
+  const tagOptions = useMemo(() => {
+    const tagSet = new Set<string>()
+    participants.forEach((p) => (p.tags ?? []).forEach((t) => tagSet.add(t)))
+    return Array.from(tagSet)
+      .sort()
+      .map((t) => ({ value: t, label: t }))
+  }, [participants])
 
   // ─── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="px-6 py-6">
-      {/* Filter bar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {/* Search */}
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchRaw}
-            onChange={(e) => setSearchRaw(e.target.value)}
-            placeholder="Name or phone…"
-            className="pl-8 text-sm"
+      {/* Action bar */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchRaw}
+              onChange={(e) => setSearchRaw(e.target.value)}
+              placeholder="Name or phone…"
+              className="pl-8 text-sm"
+            />
+            {searchRaw && (
+              <button
+                type="button"
+                onClick={() => setSearchRaw('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <FilterDropdown
+            label="Sub-group"
+            options={sgOptions}
+            selected={filterSubGroups}
+            onChange={(v) => {
+              setFilterSubGroups(v)
+              setPage(1)
+            }}
           />
-          {searchRaw && (
-            <button
-              type="button"
-              onClick={() => setSearchRaw('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <FilterDropdown
+            label="Payment"
+            options={psOptions}
+            selected={filterPaymentStates}
+            onChange={(v) => {
+              setFilterPaymentStates(v as PaymentState[])
+              setPage(1)
+            }}
+          />
+          <FilterDropdown
+            label="Check-in"
+            options={ciOptions}
+            selected={filterCheckInStates}
+            onChange={(v) => {
+              setFilterCheckInStates(v)
+              setPage(1)
+            }}
+          />
+          <FilterDropdown
+            label="Room type"
+            options={rtOptions}
+            selected={filterRoomTypes}
+            onChange={(v) => {
+              setFilterRoomTypes(v)
+              setPage(1)
+            }}
+          />
+          {tagOptions.length > 0 && (
+            <FilterDropdown
+              label="Tags"
+              options={tagOptions}
+              selected={filterTags}
+              onChange={(v) => {
+                setFilterTags(v)
+                setPage(1)
+              }}
+            />
+          )}
+
+          {/* Has-room toggle */}
+          <div className="flex overflow-hidden rounded-md border border-input text-sm">
+            {(['all', 'assigned', 'unassigned'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  setHasRoom(v)
+                  setPage(1)
+                }}
+                className={`px-3 py-1.5 capitalize transition-colors ${
+                  hasRoom === v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v === 'all' ? 'All rooms' : v === 'assigned' ? 'Has room' : 'No room'}
+              </button>
+            ))}
+          </div>
+
+          {/* Show cancelled */}
+          <button
+            type="button"
+            onClick={() => setShowCancelled((s) => !s)}
+            className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+              showCancelled
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-input bg-background text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {showCancelled ? 'Hiding: none' : 'Hiding: cancelled'}
+          </button>
+
+          {hasAnyFilter && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
           )}
         </div>
 
-        <FilterDropdown
-          label="Sub-group"
-          options={sgOptions}
-          selected={filterSubGroups}
-          onChange={(v) => { setFilterSubGroups(v); setPage(1) }}
-        />
-        <FilterDropdown
-          label="Payment"
-          options={psOptions}
-          selected={filterPaymentStates}
-          onChange={(v) => { setFilterPaymentStates(v as PaymentState[]); setPage(1) }}
-        />
-        <FilterDropdown
-          label="Check-in"
-          options={ciOptions}
-          selected={filterCheckInStates}
-          onChange={(v) => { setFilterCheckInStates(v); setPage(1) }}
-        />
-        <FilterDropdown
-          label="Room type"
-          options={rtOptions}
-          selected={filterRoomTypes}
-          onChange={(v) => { setFilterRoomTypes(v); setPage(1) }}
-        />
-
-        {/* Has-room toggle */}
-        <div className="flex rounded-md border border-input overflow-hidden text-sm">
-          {(['all', 'assigned', 'unassigned'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => { setHasRoom(v); setPage(1) }}
-              className={`px-3 py-1.5 capitalize transition-colors ${
-                hasRoom === v
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {v === 'all' ? 'All rooms' : v === 'assigned' ? 'Has room' : 'No room'}
-            </button>
-          ))}
-        </div>
-
-        {/* Show cancelled */}
-        <button
-          type="button"
-          onClick={() => setShowCancelled((s) => !s)}
-          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-            showCancelled
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-input bg-background text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          {showCancelled ? 'Hiding: none' : 'Hiding: cancelled'}
-        </button>
-
-        {hasAnyFilter && (
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        )}
+        {/* Add participant button */}
+        <Button size="sm" onClick={() => navigate('participants/new')}>
+          <Plus className="h-4 w-4" />
+          Add participant
+        </Button>
       </div>
 
       {/* Result count */}
@@ -381,19 +492,38 @@ export function ParticipantListPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <SortableHead label="Name" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHead
+                    label="Name"
+                    field="name"
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                  />
                 </TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead className="w-20">Gender</TableHead>
                 <TableHead>
-                  <SortableHead label="Sub-group" field="subGroup" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHead
+                    label="Sub-group"
+                    field="subGroup"
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                  />
                 </TableHead>
                 <TableHead>Room type</TableHead>
                 <TableHead>
-                  <SortableHead label="Fee status" field="feeStatus" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHead
+                    label="Fee status"
+                    field="feeStatus"
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSort={handleSort}
+                  />
                 </TableHead>
                 <TableHead className="w-28">Check-in</TableHead>
                 <TableHead className="w-28">Room</TableHead>
+                <TableHead>Tags</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -406,7 +536,9 @@ export function ParticipantListPage() {
                   <TableCell className="font-medium">
                     {p.fullName}
                     {p.registrationState === 'CANCELLED' && (
-                      <Badge variant="destructive" className="ml-2 text-xs">Cancelled</Badge>
+                      <Badge variant="destructive" className="ml-2 text-xs">
+                        Cancelled
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{p.phone}</TableCell>
@@ -414,17 +546,24 @@ export function ParticipantListPage() {
                     <Badge variant="outline">{p.gender}</Badge>
                   </TableCell>
                   <TableCell>{p.subGroupName}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.roomTypePreferenceName}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {p.roomTypePreferenceName}
+                  </TableCell>
                   <TableCell>
                     <FeeStatusCell p={p} currency={currency} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={p.checkInState === 'ARRIVED' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={p.checkInState === 'ARRIVED' ? 'default' : 'secondary'}
+                    >
                       {p.checkInState === 'ARRIVED' ? 'Arrived' : 'Not arrived'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {p.roomNumber ? `Room ${p.roomNumber}` : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <TagsCell tags={p.tags ?? []} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -465,10 +604,11 @@ export function ParticipantListPage() {
       )}
 
       {/* Detail drawer */}
-      <ParticipantDrawer
+      <DetailDrawer
         participant={selectedParticipant}
         currency={currency}
         onClose={() => setSelectedId(null)}
+        onMutated={refresh}
       />
     </div>
   )

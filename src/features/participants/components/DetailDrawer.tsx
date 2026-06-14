@@ -1,0 +1,710 @@
+import { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
+import { getAuth } from 'firebase/auth'
+import { X, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import type { Timestamp } from 'firebase/firestore'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { formatMoney } from '@/lib/formatMoney'
+import { useCampData } from '@/features/camp-layout/CampDataContext'
+import {
+  cancelRegistration,
+  restoreRegistration,
+  undoCheckIn,
+  changeRoomType,
+  waiveFee,
+  editNotes,
+  addTag,
+  removeTag,
+} from '../services/participantService'
+import { type Participant, type PaymentState, derivePaymentState } from '../types'
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function fmtDate(ts: Timestamp | undefined): string {
+  if (!ts) return '—'
+  return ts.toDate().toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function fmtTs(ts: Timestamp | undefined): string {
+  if (!ts) return '—'
+  return ts.toDate().toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function PaymentBadge({ state }: { state: PaymentState }) {
+  const styles: Record<PaymentState, string> = {
+    PAID: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    PARTIAL: 'bg-amber-50 text-amber-700 border border-amber-200',
+    PENDING: 'bg-red-50 text-red-700 border border-red-200',
+    WAIVED: 'bg-muted text-muted-foreground border border-border',
+  }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[state]}`}>
+      {state}
+    </span>
+  )
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-36 shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm">{value ?? '—'}</span>
+    </div>
+  )
+}
+
+function getUpdatedBy(): string {
+  const user = getAuth().currentUser
+  return user?.email ?? user?.uid ?? 'admin'
+}
+
+// ─── component ────────────────────────────────────────────────────────────────
+
+export function DetailDrawer({
+  participant,
+  currency,
+  onClose,
+  onMutated,
+}: {
+  participant: Participant | null
+  currency: string
+  onClose: () => void
+  onMutated: () => void
+}) {
+  const { id: campId } = useParams<{ id: string }>()
+  const { roomTypes } = useCampData()
+
+  const open = participant !== null
+
+  // Local state for optimistic updates — stays non-null during close animation
+  const [local, setLocal] = useState<Participant | null>(null)
+  useEffect(() => {
+    if (participant !== null) setLocal(participant)
+  }, [participant])
+
+  const p = local
+  const paymentState = p ? derivePaymentState(p) : null
+  const roomedWithBalance =
+    !!p?.roomId && paymentState !== 'PAID' && paymentState !== 'WAIVED'
+
+  // ─── UI state ───────────────────────────────────────────────────────────────
+  const [busy, setBusy] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesText, setNotesText] = useState('')
+  const [showRTModal, setShowRTModal] = useState(false)
+  const [selectedRTId, setSelectedRTId] = useState('')
+  const [showWaiveModal, setShowWaiveModal] = useState(false)
+  const [waiverNote, setWaiverNote] = useState('')
+
+  // Reset ephemeral UI on participant change
+  useEffect(() => {
+    setConfirmCancel(false)
+    setEditingNotes(false)
+    setTagInput('')
+    setShowRTModal(false)
+    setShowWaiveModal(false)
+  }, [participant?.id])
+
+  // ─── mutation helper ─────────────────────────────────────────────────────────
+
+  async function run(
+    fn: () => Promise<void>,
+    optimistic?: (prev: Participant) => Participant,
+  ): Promise<boolean> {
+    if (!p || !campId || busy) return false
+    const prevLocal = local
+    setBusy(true)
+    try {
+      if (optimistic) setLocal(optimistic(p))
+      await fn()
+      onMutated()
+      return true
+    } catch (err: unknown) {
+      setLocal(prevLocal)
+      toast.error((err as Error)?.message ?? 'Something went wrong')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ─── actions ─────────────────────────────────────────────────────────────────
+
+  async function handleCancel() {
+    const ok = await run(
+      () => cancelRegistration(campId!, p!.id, getUpdatedBy()),
+      (prev) => ({ ...prev, registrationState: 'CANCELLED' as const }),
+    )
+    if (ok) {
+      setConfirmCancel(false)
+      toast.success('Registration cancelled')
+    }
+  }
+
+  async function handleRestore() {
+    const ok = await run(
+      () => restoreRegistration(campId!, p!.id, getUpdatedBy()),
+      (prev) => ({ ...prev, registrationState: 'REGISTERED' as const }),
+    )
+    if (ok) toast.success('Registration restored')
+  }
+
+  async function handleUndoCheckIn() {
+    const ok = await run(
+      () => undoCheckIn(campId!, p!.id, getUpdatedBy()),
+      (prev) => ({
+        ...prev,
+        checkInState: 'NOT_ARRIVED' as const,
+        checkedInBy: undefined,
+        checkedInAt: undefined,
+      }),
+    )
+    if (ok) toast.success('Check-in undone')
+  }
+
+  async function handleChangeRoomType() {
+    const rt = roomTypes.find((r) => r.id === selectedRTId)
+    if (!rt || !p) return
+    const ok = await run(
+      () => changeRoomType(campId!, p.id, rt.id, rt.name, rt.price, getUpdatedBy()),
+      (prev) => ({
+        ...prev,
+        roomTypePreferenceId: rt.id,
+        roomTypePreferenceName: rt.name,
+        feeOwed: rt.price,
+      }),
+    )
+    if (ok) {
+      setShowRTModal(false)
+      toast.success('Room type updated')
+    }
+  }
+
+  async function handleWaiveFee() {
+    if (!waiverNote.trim()) return
+    const ok = await run(
+      () => waiveFee(campId!, p!.id, waiverNote.trim(), getUpdatedBy()),
+      (prev) => ({ ...prev, feeOwed: 0, feeWaiverNote: waiverNote.trim() }),
+    )
+    if (ok) {
+      setShowWaiveModal(false)
+      setWaiverNote('')
+      toast.success('Fee waived')
+    }
+  }
+
+  async function handleSaveNotes() {
+    const ok = await run(
+      () => editNotes(campId!, p!.id, notesText, getUpdatedBy()),
+      (prev) => ({ ...prev, notes: notesText.trim() || undefined }),
+    )
+    if (ok) {
+      setEditingNotes(false)
+      toast.success('Notes saved')
+    }
+  }
+
+  async function handleAddTag() {
+    const tag = tagInput.trim()
+    if (!tag || !p) return
+    if ((p.tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase())) {
+      toast.error('Tag already exists')
+      return
+    }
+    const ok = await run(
+      () => addTag(campId!, p.id, tag, getUpdatedBy()),
+      (prev) => ({ ...prev, tags: [...(prev.tags ?? []), tag] }),
+    )
+    if (ok) setTagInput('')
+  }
+
+  async function handleRemoveTag(tag: string) {
+    await run(
+      () => removeTag(campId!, p!.id, tag, getUpdatedBy()),
+      (prev) => ({ ...prev, tags: (prev.tags ?? []).filter((t) => t !== tag) }),
+    )
+  }
+
+  // ─── computed ────────────────────────────────────────────────────────────────
+
+  const newRoomTypeFee = roomTypes.find((r) => r.id === selectedRTId)?.price
+
+  // ─── render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={onClose}
+        aria-hidden
+      />
+
+      {/* Panel */}
+      <div
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-[480px] flex-col border-l bg-background shadow-xl transition-transform duration-200 ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {!p ? null : (
+          <>
+            {/* Header */}
+            <div className="flex items-start justify-between border-b px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold leading-tight">{p.fullName}</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {p.phone} · {p.gender === 'M' ? 'Male' : 'Female'}
+                  {p.age != null && ` · Age ${p.age}`}
+                  {p.dateOfBirth && !p.age && ` · DOB ${fmtDate(p.dateOfBirth)}`}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-8 w-8 shrink-0 p-0"
+                onClick={onClose}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Status badges */}
+            <div className="flex flex-wrap gap-2 border-b px-6 py-3">
+              <Badge
+                variant={p.registrationState === 'REGISTERED' ? 'default' : 'destructive'}
+              >
+                {p.registrationState}
+              </Badge>
+              {paymentState && <PaymentBadge state={paymentState} />}
+              <Badge variant={p.checkInState === 'ARRIVED' ? 'default' : 'secondary'}>
+                {p.checkInState === 'ARRIVED' ? 'Checked in' : 'Not arrived'}
+              </Badge>
+              {p.roomNumber && <Badge variant="outline">Room {p.roomNumber}</Badge>}
+            </div>
+
+            {/* Scrollable content */}
+            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+
+              {/* Warning banners */}
+              {p.registrationState === 'CANCELLED' && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  This registration has been cancelled.
+                </div>
+              )}
+              {roomedWithBalance && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+                  ⚠️ Roomed with outstanding balance
+                </div>
+              )}
+
+              {/* Tags */}
+              <section className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tags
+                </p>
+                <div className="flex flex-wrap gap-1.5 min-h-[1.5rem]">
+                  {(p.tags ?? []).length === 0 ? (
+                    <span className="text-sm text-muted-foreground">No tags</span>
+                  ) : (
+                    (p.tags ?? []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          disabled={busy}
+                          className="ml-0.5 rounded-full text-muted-foreground hover:text-destructive disabled:opacity-50"
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag() } }}
+                    placeholder="Add tag…"
+                    className="h-7 text-sm"
+                    disabled={busy}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAddTag}
+                    disabled={busy || !tagInput.trim()}
+                    className="h-7 shrink-0 gap-1 px-2 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add
+                  </Button>
+                </div>
+              </section>
+
+              <Separator />
+
+              {/* Registration */}
+              <section className="space-y-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Registration
+                </p>
+                <Row label="Sub-group" value={p.subGroupName} />
+                <Row
+                  label="Room type"
+                  value={
+                    <span className="flex items-center gap-2">
+                      {p.roomTypePreferenceName}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRTId(p.roomTypePreferenceId)
+                          setShowRTModal(true)
+                        }}
+                        className="text-xs text-primary hover:underline disabled:opacity-50"
+                        disabled={busy}
+                      >
+                        Change
+                      </button>
+                    </span>
+                  }
+                />
+                {p.email && <Row label="Email" value={p.email} />}
+              </section>
+
+              <Separator />
+
+              {/* Payment */}
+              <section className="space-y-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Payment
+                </p>
+                <Row label="Fee owed" value={formatMoney(p.feeOwed, currency)} />
+                <Row label="Amount paid" value={formatMoney(p.amountPaid, currency)} />
+                {p.feeOwed > 0 && p.amountPaid < p.feeOwed && (
+                  <Row
+                    label="Balance due"
+                    value={
+                      <span className="font-medium text-destructive">
+                        {formatMoney(p.feeOwed - p.amountPaid, currency)}
+                      </span>
+                    }
+                  />
+                )}
+                {p.feeOwed > 0 && p.amountPaid > p.feeOwed && (
+                  <Row
+                    label="Credit"
+                    value={
+                      <span className="font-medium text-emerald-600">
+                        {formatMoney(p.amountPaid - p.feeOwed, currency)}
+                      </span>
+                    }
+                  />
+                )}
+                {p.feeWaiverNote && (
+                  <Row
+                    label="Waiver note"
+                    value={
+                      <span className="italic text-muted-foreground">{p.feeWaiverNote}</span>
+                    }
+                  />
+                )}
+                {paymentState !== 'WAIVED' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setWaiverNote('')
+                      setShowWaiveModal(true)
+                    }}
+                    disabled={busy}
+                    className="mt-1"
+                  >
+                    Waive fee
+                  </Button>
+                )}
+              </section>
+
+              {/* Check-in / Room */}
+              {(p.roomId || p.checkInState === 'ARRIVED') && (
+                <>
+                  <Separator />
+                  <section className="space-y-2.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Check-in / Room
+                    </p>
+                    <Row
+                      label="Room"
+                      value={p.roomNumber ? `Room ${p.roomNumber}` : 'Checked in (no room)'}
+                    />
+                    {p.checkedInAt && (
+                      <Row label="Checked in at" value={fmtTs(p.checkedInAt)} />
+                    )}
+                    {p.checkedInBy && (
+                      <Row label="Checked in by" value={p.checkedInBy} />
+                    )}
+                    {p.roomAssignedAt && (
+                      <Row label="Room assigned at" value={fmtTs(p.roomAssignedAt)} />
+                    )}
+                    {p.roomAssignedBy && (
+                      <Row label="Room assigned by" value={p.roomAssignedBy} />
+                    )}
+                    {p.checkInState === 'ARRIVED' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUndoCheckIn}
+                        disabled={busy}
+                      >
+                        Undo check-in
+                      </Button>
+                    )}
+                  </section>
+                </>
+              )}
+
+              {/* Notes */}
+              <Separator />
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Notes
+                  </p>
+                  {!editingNotes && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotesText(p.notes ?? '')
+                        setEditingNotes(true)
+                      }}
+                      className="text-xs text-primary hover:underline disabled:opacity-50"
+                      disabled={busy}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+                {editingNotes ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={notesText}
+                      onChange={(e) => setNotesText(e.target.value)}
+                      rows={3}
+                      placeholder="Add a note…"
+                      className="text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveNotes} disabled={busy}>
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingNotes(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">
+                    {p.notes || (
+                      <span className="text-muted-foreground">No notes</span>
+                    )}
+                  </p>
+                )}
+              </section>
+
+              {/* Audit */}
+              <Separator />
+              <section className="space-y-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Audit
+                </p>
+                <Row label="Registered at" value={fmtTs(p.createdAt)} />
+                <Row label="Last updated" value={fmtTs(p.updatedAt)} />
+                {p.updatedBy && <Row label="Updated by" value={p.updatedBy} />}
+              </section>
+
+              {/* Actions */}
+              <Separator />
+              <section className="space-y-2 pb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Actions
+                </p>
+                {p.registrationState === 'REGISTERED' ? (
+                  confirmCancel ? (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                      <p className="text-sm text-destructive">
+                        Cancel this registration? This cannot be easily undone.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleCancel}
+                          disabled={busy}
+                        >
+                          Yes, cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmCancel(false)}
+                        >
+                          Keep
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmCancel(true)}
+                      disabled={busy}
+                      className="text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50"
+                    >
+                      Cancel registration
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRestore}
+                    disabled={busy}
+                  >
+                    Restore registration
+                  </Button>
+                )}
+              </section>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t px-6 py-4">
+              <Button variant="outline" className="w-full" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+
+            {/* Change Room Type Dialog */}
+            <Dialog open={showRTModal} onOpenChange={setShowRTModal}>
+              <DialogContent showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Change room type preference</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Changing the room type will update the fee owed.
+                  </p>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {roomTypes.map((rt) => (
+                      <label
+                        key={rt.id}
+                        className="flex cursor-pointer items-center gap-2.5 rounded-md border p-2.5 text-sm hover:bg-muted"
+                      >
+                        <input
+                          type="radio"
+                          name="room-type-select"
+                          value={rt.id}
+                          checked={selectedRTId === rt.id}
+                          onChange={() => setSelectedRTId(rt.id)}
+                          className="h-4 w-4"
+                        />
+                        <span className="flex-1">{rt.name}</span>
+                        <span className="text-muted-foreground">{formatMoney(rt.price, currency)}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {p && newRoomTypeFee !== undefined && newRoomTypeFee !== p.feeOwed && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      Fee will change from {formatMoney(p.feeOwed, currency)} to{' '}
+                      {formatMoney(newRoomTypeFee, currency)}.
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowRTModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleChangeRoomType}
+                    disabled={busy || !selectedRTId || selectedRTId === p?.roomTypePreferenceId}
+                  >
+                    Confirm change
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Waive Fee Dialog */}
+            <Dialog open={showWaiveModal} onOpenChange={setShowWaiveModal}>
+              <DialogContent showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Waive fee</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Sets fee owed to {formatMoney(0, currency)}. Provide a reason.
+                  </p>
+                  <Textarea
+                    value={waiverNote}
+                    onChange={(e) => setWaiverNote(e.target.value)}
+                    placeholder="Reason for waiving fee…"
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowWaiveModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleWaiveFee} disabled={busy || !waiverNote.trim()}>
+                    Waive fee
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      </div>
+    </>
+  )
+}

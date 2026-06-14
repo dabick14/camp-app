@@ -12,6 +12,7 @@ import { RoomsPage } from '@/features/rooms/pages/RoomsPage'
 import { CampLayout } from '@/features/camp-layout/CampLayout'
 import { ParticipantListPage } from '@/features/participants/ParticipantListPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
+import { AdminAddParticipantPage } from '@/features/admin-add-participant/AdminAddParticipantPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
@@ -51,6 +52,7 @@ export default function App() {
             element={<AdminRoute><CampLayout /></AdminRoute>}
           >
             <Route index element={<ParticipantListPage />} />
+            <Route path="participants/new" element={<AdminAddParticipantPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="rooms" element={<RoomsPage />} />
             <Route path="payments" element={<PaymentsPlaceholder />} />
