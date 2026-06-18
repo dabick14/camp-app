@@ -13,6 +13,8 @@ import { CampLayout } from '@/features/camp-layout/CampLayout'
 import { ParticipantListPage } from '@/features/participants/ParticipantListPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { AdminAddParticipantPage } from '@/features/admin-add-participant/AdminAddParticipantPage'
+import { HubtelTransactionsPage } from '@/features/payments/hubtel/pages/HubtelTransactionsPage'
+import { HubtelReturnPage } from '@/features/payments/hubtel/pages/HubtelReturnPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
@@ -35,6 +37,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/r/:campId" element={<RegistrationPage />} />
           <Route path="/r/:campId/done" element={<ConfirmationPage />} />
+          <Route path="/pay/return" element={<HubtelReturnPage />} />
 
           {/* Admin — list + new camp */}
           <Route
@@ -56,6 +59,7 @@ export default function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="rooms" element={<RoomsPage />} />
             <Route path="payments" element={<PaymentsPlaceholder />} />
+            <Route path="hubtel-transactions" element={<HubtelTransactionsPage />} />
             <Route path="settings" element={<CampSettingsPage />} />
           </Route>
 

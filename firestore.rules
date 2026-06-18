@@ -37,6 +37,30 @@ service cloud.firestore {
         // Cloud Function (admin SDK bypasses rules). No direct client writes allowed.
         allow create: if false;
       }
+
+      match /paymentBatches/{batchId} {
+        // Hubtel-created batches + manual quarantine assignment write here; the Hubtel
+        // viewer reads them. Admin-only. (Any public read for registration-gating is the
+        // base payments feature's call, not this integration's.)
+        allow read, write: if isAdmin();
+      }
+
+      // Hubtel checkout sessions + audit trail. Webhook writes via the admin SDK
+      // (bypasses rules); these cover the admin viewer + manual quarantine assign.
+      match /hubtelTransactions/{txnId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // Top-level reference → campId pointer, written at checkout init by the admin and
+    // read by the public callback Cloud Function (admin SDK). Admin-only for clients.
+    match /hubtelReferences/{reference} {
+      allow read, write: if isAdmin();
+    }
+
+    // Orphan Hubtel callbacks (no matching session) land here for admin review.
+    match /hubtelQuarantine/{txnId} {
+      allow read, write: if isAdmin();
     }
   }
 }
