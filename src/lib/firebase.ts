@@ -22,16 +22,11 @@ if (import.meta.env.DEV && import.meta.env.VITE_FUNCTIONS_EMULATOR === 'true') {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
 }
 
-// In dev, emit a debug token to the console. Add it to Firebase console under
-// App Check → <app> → Manage debug tokens. Enforcement stays OFF until Day 6.
-if (import.meta.env.DEV) {
-  // Use the fixed token from .env.local so it's stable across sessions.
-  // Register the same value in Firebase console → App Check → Manage debug tokens.
-  // @ts-expect-error — App Check debug token global
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true
+// App Check enforcement is OFF until Day 6 — skip initialization in dev to
+// avoid reCAPTCHA errors on localhost (site key isn't authorized for that domain).
+if (!import.meta.env.DEV) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
+    isTokenAutoRefreshEnabled: true,
+  })
 }
-
-initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
-  isTokenAutoRefreshEnabled: true,
-})
