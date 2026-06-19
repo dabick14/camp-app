@@ -80,6 +80,24 @@ function Field({
   )
 }
 
+// ─── viewport hook ────────────────────────────────────────────────────────────
+// Returns true when the viewport matches the given media query.
+// Initialises from matchMedia so the first render is correct — no flash.
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' ? window.matchMedia(query).matches : false,
+  )
+  useEffect(() => {
+    const mql = window.matchMedia(query)
+    const update = () => setMatches(mql.matches)
+    mql.addEventListener('change', update)
+    update()
+    return () => mql.removeEventListener('change', update)
+  }, [query])
+  return matches
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 type PageStatus = 'loading' | 'open' | 'closed' | 'notFound' | 'error'
@@ -106,11 +124,16 @@ export function RegistrationPage() {
   const [softDup, setSoftDup] = useState<{ type: string; message: string } | null>(null)
   const acknowledgedDupsRef = useRef<string[]>([])
 
-  // ─── sub-group combobox state ───────────────────────────────────────────────
+  // ─── sub-group picker state ─────────────────────────────────────────────────
   const [sgSearch, setSgSearch] = useState('')
   const [sgOpen, setSgOpen] = useState(false)
   const sgRef = useRef<HTMLDivElement>(null)
 
+  // True when the viewport is ≥768px (Tailwind's md breakpoint).
+  // Below this we render a full-screen modal instead of a dropdown.
+  const isDesktop = useMediaQuery('(min-width: 768px)')
+
+  // Outside-click closes the desktop dropdown. Not needed on mobile (modal covers the screen).
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
       if (sgRef.current && !sgRef.current.contains(e.target as Node)) {
@@ -118,9 +141,26 @@ export function RegistrationPage() {
         setSgSearch('')
       }
     }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [])
+    if (isDesktop) {
+      document.addEventListener('mousedown', handleOutside)
+      return () => document.removeEventListener('mousedown', handleOutside)
+    }
+  }, [isDesktop])
+
+  // Lock body scroll while the mobile modal is open.
+  useEffect(() => {
+    if (sgOpen && !isDesktop) {
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = '' }
+    }
+  }, [sgOpen, isDesktop])
+
+  // 200ms debounce for mobile list filtering — avoids re-renders on every keystroke.
+  const [debouncedSgSearch, setDebouncedSgSearch] = useState('')
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSgSearch(sgSearch), 200)
+    return () => clearTimeout(id)
+  }, [sgSearch])
 
   // ─── load camp data ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -201,8 +241,13 @@ export function RegistrationPage() {
   }, [watchedDob, watchedAge, useDob, camp])
 
   const selectedSubGroup = subGroups.find((sg) => sg.id === selectedSubGroupId)
+
+  // Desktop: instant filter. Mobile: uses debounced value (set via effect above).
   const filteredSubGroups = subGroups.filter((sg) =>
     sg.name.toLowerCase().includes(sgSearch.toLowerCase()),
+  )
+  const mobileFilteredSubGroups = subGroups.filter((sg) =>
+    sg.name.toLowerCase().includes(debouncedSgSearch.toLowerCase()),
   )
 
   async function onSubmit(values: Schema) {
@@ -435,18 +480,20 @@ export function RegistrationPage() {
           )}
         </div>
 
-        {/* Sub-group — searchable combobox */}
+        {/* Sub-group — desktop: inline dropdown / mobile: full-screen modal */}
         <div className="space-y-1.5">
           <Label>
             Sub-group<span className="ml-0.5 text-destructive" aria-hidden>*</span>
           </Label>
           <input type="hidden" {...register('subGroupId')} />
+
+          {/* Trigger button — shared across both viewports */}
           <div className="relative" ref={sgRef}>
             <button
               type="button"
               aria-expanded={sgOpen}
               className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                sgOpen ? 'border-ring ring-1 ring-ring/50' : 'border-input'
+                sgOpen && isDesktop ? 'border-ring ring-1 ring-ring/50' : 'border-input'
               } bg-background`}
               onClick={() => setSgOpen(!sgOpen)}
             >
@@ -456,7 +503,8 @@ export function RegistrationPage() {
               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
 
-            {sgOpen && (
+            {/* Desktop dropdown — rendered only on md+ */}
+            {sgOpen && isDesktop && (
               <div className="absolute z-20 mt-1 w-full rounded-md border bg-background shadow-lg">
                 <div className="border-b p-1.5">
                   <Input
@@ -495,10 +543,66 @@ export function RegistrationPage() {
               </div>
             )}
           </div>
+
           {errors.subGroupId && (
             <p className="text-sm text-destructive">{errors.subGroupId.message}</p>
           )}
         </div>
+
+        {/* Mobile full-screen modal picker — rendered only below md */}
+        {sgOpen && !isDesktop && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-background">
+            {/* Header */}
+            <div className="relative flex items-center border-b px-4 py-3">
+              <button
+                type="button"
+                className="text-sm font-medium text-primary"
+                onClick={() => { setSgOpen(false); setSgSearch('') }}
+              >
+                Cancel
+              </button>
+              <p className="pointer-events-none absolute inset-x-0 text-center text-sm font-semibold">
+                Select sub-group
+              </p>
+            </div>
+
+            {/* Search — font-size stays at text-base (16px) to prevent zoom */}
+            <div className="border-b p-3">
+              <Input
+                autoFocus
+                value={sgSearch}
+                onChange={(e) => setSgSearch(e.target.value)}
+                placeholder="Search…"
+              />
+            </div>
+
+            {/* Scrollable list — fills remaining viewport below the keyboard */}
+            <ul className="flex-1 overflow-y-auto">
+              {mobileFilteredSubGroups.length === 0 ? (
+                <li className="px-4 py-3 text-sm text-muted-foreground">No matches</li>
+              ) : (
+                mobileFilteredSubGroups.map((sg) => (
+                  <li key={sg.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 border-b px-4 py-4 text-left text-sm active:bg-muted"
+                      onClick={() => {
+                        setValue('subGroupId', sg.id, { shouldTouch: true, shouldValidate: true })
+                        setSgOpen(false)
+                        setSgSearch('')
+                      }}
+                    >
+                      <span className="flex-1">{sg.name}</span>
+                      {selectedSubGroupId === sg.id && (
+                        <Check className="h-4 w-4 shrink-0 text-primary" />
+                      )}
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        )}
 
         {/* Room type — radio cards */}
         <div className="space-y-1.5">
