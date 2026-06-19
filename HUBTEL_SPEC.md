@@ -97,7 +97,7 @@ retries and races cannot create duplicate batches.
 ## Quarantine + manual recovery
 
 A **Success** callback whose `clientReference` matches no session lands in
-`hubtelQuarantine/{id}` (we never drop money). In **Hubtel transactions**, quarantined
+`hubtelQuarantine/{id}` (we never drop money). On the **Payments** tab, quarantined
 items show in an amber panel. An admin clicks **Resolve** →
 - **Assign to a sub-group:** creates a `PaymentBatch` (source `hubtel`) for that sub-group
   and marks the quarantine doc `MATCHED`. Not unlinkable afterwards (audit-only).
@@ -150,7 +150,7 @@ feature is unaffected):
 
 ## Day-to-day for an admin
 
-1. Open a camp → **Hubtel** tab.
+1. Open a camp → **Payments** tab (Hubtel is the payment gateway).
 2. **New payment** → pick the sub-group and amount → **Continue to payment**.
 3. Complete the MoMo prompt in the embedded checkout. The window confirms automatically.
 4. The confirmed payment appears as a **Matched** row and a `PaymentBatch` now exists for

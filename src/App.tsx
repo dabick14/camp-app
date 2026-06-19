@@ -20,14 +20,6 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute>{children}</ProtectedRoute>
 }
 
-function PaymentsPlaceholder() {
-  return (
-    <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-      Payments — coming in Day 5
-    </div>
-  )
-}
-
 export default function App() {
   return (
     <TooltipProvider>
@@ -58,8 +50,7 @@ export default function App() {
             <Route path="participants/new" element={<AdminAddParticipantPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="rooms" element={<RoomsPage />} />
-            <Route path="payments" element={<PaymentsPlaceholder />} />
-            <Route path="hubtel-transactions" element={<HubtelTransactionsPage />} />
+            <Route path="payments" element={<HubtelTransactionsPage />} />
             <Route path="settings" element={<CampSettingsPage />} />
           </Route>
 

@@ -82,9 +82,10 @@ export function HubtelTransactionsPage() {
     <div className="mx-auto max-w-5xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Hubtel transactions</h1>
+          <h1 className="text-xl font-semibold">Payments</h1>
           <p className="text-sm text-muted-foreground">
-            MoMo payments taken in-app. Each confirmed payment creates a payment batch.
+            MoMo &amp; card payments taken in-app via Hubtel. Each confirmed payment creates
+            a payment batch.
           </p>
         </div>
         <div className="flex items-center gap-2">

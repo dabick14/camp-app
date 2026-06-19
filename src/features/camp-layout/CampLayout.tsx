@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { ChevronLeft, CreditCard, LayoutGrid, DoorOpen, RefreshCw, Settings, Smartphone, Users } from 'lucide-react'
+import { ChevronLeft, CreditCard, LayoutGrid, DoorOpen, RefreshCw, Settings, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { formatDateRange } from '@/lib/dates'
@@ -96,7 +96,6 @@ function CampLayoutInner() {
             { to: `${base}/dashboard`, end: false, label: 'Dashboard', icon: LayoutGrid },
             { to: `${base}/rooms`, end: false, label: 'Rooms', icon: DoorOpen },
             { to: `${base}/payments`, end: false, label: 'Payments', icon: CreditCard },
-            { to: `${base}/hubtel-transactions`, end: false, label: 'Hubtel', icon: Smartphone },
             { to: `${base}/settings`, end: false, label: 'Settings', icon: Settings },
           ].map(({ to, end, label, icon: Icon }) => (
             <NavLink
