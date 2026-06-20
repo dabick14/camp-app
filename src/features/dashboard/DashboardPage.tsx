@@ -39,7 +39,7 @@ export function DashboardPage() {
 
   // ─── top-level metrics ──────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0
+    let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0, overrides = 0
     for (const p of active) {
       const ps = derivePaymentState(p)
       if (ps === 'PAID') paid++
@@ -47,8 +47,9 @@ export function DashboardPage() {
       else if (ps === 'PENDING') pending++
       else if (ps === 'WAIVED') waived++
       if (p.roomId) roomed++
+      if (p.roomedWithoutFullPayment) overrides++
     }
-    return { registered: active.length, paid, partial, pending, waived, roomed }
+    return { registered: active.length, paid, partial, pending, waived, roomed, overrides }
   }, [active])
 
   // ─── per sub-group ──────────────────────────────────────────────────────────
@@ -125,12 +126,13 @@ export function DashboardPage() {
       </div>
 
       {/* Big metric cards */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <BigMetric label="Registered" value={metrics.registered} />
         <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} />
         <BigMetric label="Partial" value={metrics.partial} />
         <BigMetric label="Pending" value={metrics.pending} />
         <BigMetric label="Roomed" value={metrics.roomed} />
+        <BigMetric label="Overrides" value={metrics.overrides} />
       </div>
 
       <div className="space-y-10">

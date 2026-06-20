@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { deleteField } from 'firebase/firestore'
 import { auth } from '@/lib/firebase'
 import { createRoom, updateRoom } from '../services/roomService'
 import type { Room, RoomType } from '../types'
@@ -103,7 +104,7 @@ export function RoomFormModal({
             roomTypeId,
             roomTypeName: selectedTypeName,
             capacity: resolvedCapacity,
-            notes: notes.trim() || undefined,
+            notes: notes.trim() || deleteField(),
             // number and gender are locked if occupied; only update if not locked
             ...(locked ? {} : { number: number.trim(), gender: gender as 'M' | 'F' }),
           },

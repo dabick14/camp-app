@@ -12,7 +12,10 @@
       "Bash(node_modules/.bin/tsx scripts/seed-participants.ts --camp fake)",
       "Bash(npx tsc *)",
       "Bash(mkdir -p /Users/daviddagvanderpuije/dev/flstuff/camp-app/.github/workflows)",
-      "Bash(GOOGLE_APPLICATION_CREDENTIALS=./service-account-key.json node_modules/.bin/tsx scripts/seed-participants.ts --clean --camp H3cmW6ZBg4fzQnyhycGq --yes)"
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=./service-account-key.json node_modules/.bin/tsx scripts/seed-participants.ts --clean --camp H3cmW6ZBg4fzQnyhycGq --yes)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -i '\\\\.md$')"
     ],
     "additionalDirectories": [
       "/Users/daviddagvanderpuije/dev/flstuff/camp-app",

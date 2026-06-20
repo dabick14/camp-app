@@ -6,8 +6,10 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   writeBatch,
   Timestamp,
+  type FieldValue,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { Room } from '../types'
@@ -45,14 +47,13 @@ export async function createRoom(
 export async function updateRoom(
   campId: string,
   roomId: string,
-  data: Partial<RoomInput>,
+  data: Partial<Omit<RoomInput, 'notes'>> & { notes?: string | FieldValue },
   uid: string,
 ): Promise<void> {
-  await updateDoc(doc(db, 'camps', campId, 'rooms', roomId), {
-    ...data,
-    updatedAt: Timestamp.now(),
-    updatedBy: uid,
-  })
+  const payload: Record<string, unknown> = { ...data, updatedAt: Timestamp.now(), updatedBy: uid }
+  // Firestore rejects undefined values — strip them before writing
+  Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
+  await updateDoc(doc(db, 'camps', campId, 'rooms', roomId), payload)
 }
 
 export async function deleteRoom(campId: string, roomId: string): Promise<void> {

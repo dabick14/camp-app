@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { X, Plus } from 'lucide-react'
+import { DoorOpen, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Timestamp } from 'firebase/firestore'
 import { Badge } from '@/components/ui/badge'
@@ -27,28 +27,27 @@ import {
   editNotes,
   addTag,
   removeTag,
+  unassignRoom,
+  clearRoomedWithoutFullPaymentFlag,
 } from '../services/participantService'
 import { type Participant, type PaymentState, derivePaymentState } from '../types'
+import { OverridePaymentModal } from './OverridePaymentModal'
+import { RoomPickerModal } from './RoomPickerModal'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(ts: Timestamp | undefined): string {
   if (!ts) return '—'
   return ts.toDate().toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+    day: '2-digit', month: 'short', year: 'numeric',
   })
 }
 
 function fmtTs(ts: Timestamp | undefined): string {
   if (!ts) return '—'
   return ts.toDate().toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   })
 }
 
@@ -106,12 +105,12 @@ export function DetailDrawer({
 
   const p = local
   const paymentState = p ? derivePaymentState(p) : null
-  const roomedWithBalance =
-    !!p?.roomId && paymentState !== 'PAID' && paymentState !== 'WAIVED'
 
   // ─── UI state ───────────────────────────────────────────────────────────────
   const [busy, setBusy] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmUnassign, setConfirmUnassign] = useState(false)
+  const [confirmClearFlag, setConfirmClearFlag] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesText, setNotesText] = useState('')
@@ -120,13 +119,23 @@ export function DetailDrawer({
   const [showWaiveModal, setShowWaiveModal] = useState(false)
   const [waiverNote, setWaiverNote] = useState('')
 
+  // Room assignment flow
+  const [showOverrideModal, setShowOverrideModal] = useState(false)
+  const [pendingOverrideReason, setPendingOverrideReason] = useState<string | null>(null)
+  const [showRoomPicker, setShowRoomPicker] = useState(false)
+
   // Reset ephemeral UI on participant change
   useEffect(() => {
     setConfirmCancel(false)
+    setConfirmUnassign(false)
+    setConfirmClearFlag(false)
     setEditingNotes(false)
     setTagInput('')
     setShowRTModal(false)
     setShowWaiveModal(false)
+    setShowOverrideModal(false)
+    setShowRoomPicker(false)
+    setPendingOverrideReason(null)
   }, [participant?.id])
 
   // ─── mutation helper ─────────────────────────────────────────────────────────
@@ -159,10 +168,7 @@ export function DetailDrawer({
       () => cancelRegistration(campId!, p!.id, getUpdatedBy()),
       (prev) => ({ ...prev, registrationState: 'CANCELLED' as const }),
     )
-    if (ok) {
-      setConfirmCancel(false)
-      toast.success('Registration cancelled')
-    }
+    if (ok) { setConfirmCancel(false); toast.success('Registration cancelled') }
   }
 
   async function handleRestore() {
@@ -176,12 +182,7 @@ export function DetailDrawer({
   async function handleUndoCheckIn() {
     const ok = await run(
       () => undoCheckIn(campId!, p!.id, getUpdatedBy()),
-      (prev) => ({
-        ...prev,
-        checkInState: 'NOT_ARRIVED' as const,
-        checkedInBy: undefined,
-        checkedInAt: undefined,
-      }),
+      (prev) => ({ ...prev, checkInState: 'NOT_ARRIVED' as const, checkedInBy: undefined, checkedInAt: undefined }),
     )
     if (ok) toast.success('Check-in undone')
   }
@@ -191,17 +192,9 @@ export function DetailDrawer({
     if (!rt || !p) return
     const ok = await run(
       () => changeRoomType(campId!, p.id, rt.id, rt.name, rt.price, getUpdatedBy()),
-      (prev) => ({
-        ...prev,
-        roomTypePreferenceId: rt.id,
-        roomTypePreferenceName: rt.name,
-        feeOwed: rt.price,
-      }),
+      (prev) => ({ ...prev, roomTypePreferenceId: rt.id, roomTypePreferenceName: rt.name, feeOwed: rt.price }),
     )
-    if (ok) {
-      setShowRTModal(false)
-      toast.success('Room type updated')
-    }
+    if (ok) { setShowRTModal(false); toast.success('Room type updated') }
   }
 
   async function handleWaiveFee() {
@@ -210,11 +203,7 @@ export function DetailDrawer({
       () => waiveFee(campId!, p!.id, waiverNote.trim(), getUpdatedBy()),
       (prev) => ({ ...prev, feeOwed: 0, feeWaiverNote: waiverNote.trim() }),
     )
-    if (ok) {
-      setShowWaiveModal(false)
-      setWaiverNote('')
-      toast.success('Fee waived')
-    }
+    if (ok) { setShowWaiveModal(false); setWaiverNote(''); toast.success('Fee waived') }
   }
 
   async function handleSaveNotes() {
@@ -222,18 +211,14 @@ export function DetailDrawer({
       () => editNotes(campId!, p!.id, notesText, getUpdatedBy()),
       (prev) => ({ ...prev, notes: notesText.trim() || undefined }),
     )
-    if (ok) {
-      setEditingNotes(false)
-      toast.success('Notes saved')
-    }
+    if (ok) { setEditingNotes(false); toast.success('Notes saved') }
   }
 
   async function handleAddTag() {
     const tag = tagInput.trim()
     if (!tag || !p) return
     if ((p.tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase())) {
-      toast.error('Tag already exists')
-      return
+      toast.error('Tag already exists'); return
     }
     const ok = await run(
       () => addTag(campId!, p.id, tag, getUpdatedBy()),
@@ -247,6 +232,49 @@ export function DetailDrawer({
       () => removeTag(campId!, p!.id, tag, getUpdatedBy()),
       (prev) => ({ ...prev, tags: (prev.tags ?? []).filter((t) => t !== tag) }),
     )
+  }
+
+  async function handleUnassignRoom() {
+    if (!p?.roomId) return
+    const prevRoom = p.roomNumber ?? p.roomId
+    const ok = await run(
+      () => unassignRoom(campId!, p!.id, p!.roomId!, getUpdatedBy()),
+      (prev) => ({ ...prev, roomId: undefined, roomNumber: undefined, roomAssignedBy: undefined, roomAssignedAt: undefined }),
+    )
+    if (ok) { setConfirmUnassign(false); toast.success(`Unassigned from Room ${prevRoom}`) }
+  }
+
+  async function handleClearFlag() {
+    const ok = await run(
+      () => clearRoomedWithoutFullPaymentFlag(campId!, p!.id, getUpdatedBy()),
+      (prev) => ({ ...prev, roomedWithoutFullPayment: false }),
+    )
+    if (ok) { setConfirmClearFlag(false); toast.success('Override flag cleared') }
+  }
+
+  // ─── room assignment flow ────────────────────────────────────────────────────
+
+  function handleAssignRoomClick() {
+    if (!p) return
+    if (paymentState === 'PENDING' || paymentState === 'PARTIAL') {
+      setShowOverrideModal(true)
+    } else {
+      setPendingOverrideReason(null)
+      setShowRoomPicker(true)
+    }
+  }
+
+  function handleOverrideProceed(reason: string) {
+    setPendingOverrideReason(reason)
+    setShowOverrideModal(false)
+    setShowRoomPicker(true)
+  }
+
+  function handleRoomAssigned(roomNumber: string) {
+    setShowRoomPicker(false)
+    setPendingOverrideReason(null)
+    toast.success(`Assigned to Room ${roomNumber}. Checked in.`)
+    onMutated()
   }
 
   // ─── computed ────────────────────────────────────────────────────────────────
@@ -297,9 +325,7 @@ export function DetailDrawer({
 
             {/* Status badges */}
             <div className="flex flex-wrap gap-2 border-b px-6 py-3">
-              <Badge
-                variant={p.registrationState === 'REGISTERED' ? 'default' : 'destructive'}
-              >
+              <Badge variant={p.registrationState === 'REGISTERED' ? 'default' : 'destructive'}>
                 {p.registrationState}
               </Badge>
               {paymentState && <PaymentBadge state={paymentState} />}
@@ -318,7 +344,55 @@ export function DetailDrawer({
                   This registration has been cancelled.
                 </div>
               )}
-              {roomedWithBalance && (
+
+              {/* Override flag banner — permanent audit trail */}
+              {p.roomedWithoutFullPayment && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive space-y-2">
+                  <p className="font-medium">
+                    ⚠️ Roomed with outstanding balance
+                    {p.roomedWithoutFullPaymentNote && (
+                      <span className="font-normal"> — Reason: "{p.roomedWithoutFullPaymentNote}"</span>
+                    )}
+                  </p>
+                  {confirmClearFlag ? (
+                    <div className="space-y-1.5">
+                      <p className="text-xs">
+                        Clear this flag? The reason note will be preserved for audit.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleClearFlag}
+                          disabled={busy}
+                          className="h-6 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                        >
+                          Yes, mark resolved
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfirmClearFlag(false)}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Keep
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClearFlag(true)}
+                      className="text-xs underline underline-offset-2 hover:no-underline"
+                    >
+                      Mark as resolved
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Dynamic balance warning — shown only when flag isn't already set */}
+              {!p.roomedWithoutFullPayment && !!p.roomId && paymentState !== 'PAID' && paymentState !== 'WAIVED' && (
                 <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
                   ⚠️ Roomed with outstanding balance
                 </div>
@@ -326,9 +400,7 @@ export function DetailDrawer({
 
               {/* Tags */}
               <section className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Tags
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
                 <div className="flex flex-wrap gap-1.5 min-h-[1.5rem]">
                   {(p.tags ?? []).length === 0 ? (
                     <span className="text-sm text-muted-foreground">No tags</span>
@@ -379,9 +451,7 @@ export function DetailDrawer({
 
               {/* Registration */}
               <section className="space-y-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Registration
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registration</p>
                 <Row label="Sub-group" value={p.subGroupName} />
                 <Row
                   label="Room type"
@@ -390,10 +460,7 @@ export function DetailDrawer({
                       {p.roomTypePreferenceName}
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedRTId(p.roomTypePreferenceId)
-                          setShowRTModal(true)
-                        }}
+                        onClick={() => { setSelectedRTId(p.roomTypePreferenceId); setShowRTModal(true) }}
                         className="text-xs text-primary hover:underline disabled:opacity-50"
                         disabled={busy}
                       >
@@ -409,48 +476,30 @@ export function DetailDrawer({
 
               {/* Payment */}
               <section className="space-y-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Payment
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payment</p>
                 <Row label="Fee owed" value={formatMoney(p.feeOwed, currency)} />
                 <Row label="Amount paid" value={formatMoney(p.amountPaid, currency)} />
                 {p.feeOwed > 0 && p.amountPaid < p.feeOwed && (
                   <Row
                     label="Balance due"
-                    value={
-                      <span className="font-medium text-destructive">
-                        {formatMoney(p.feeOwed - p.amountPaid, currency)}
-                      </span>
-                    }
+                    value={<span className="font-medium text-destructive">{formatMoney(p.feeOwed - p.amountPaid, currency)}</span>}
                   />
                 )}
                 {p.feeOwed > 0 && p.amountPaid > p.feeOwed && (
                   <Row
                     label="Credit"
-                    value={
-                      <span className="font-medium text-emerald-600">
-                        {formatMoney(p.amountPaid - p.feeOwed, currency)}
-                      </span>
-                    }
+                    value={<span className="font-medium text-emerald-600">{formatMoney(p.amountPaid - p.feeOwed, currency)}</span>}
                   />
                 )}
                 {p.feeWaiverNote && (
-                  <Row
-                    label="Waiver note"
-                    value={
-                      <span className="italic text-muted-foreground">{p.feeWaiverNote}</span>
-                    }
-                  />
+                  <Row label="Waiver note" value={<span className="italic text-muted-foreground">{p.feeWaiverNote}</span>} />
                 )}
                 {paymentState !== 'WAIVED' && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setWaiverNote('')
-                      setShowWaiveModal(true)
-                    }}
+                    onClick={() => { setWaiverNote(''); setShowWaiveModal(true) }}
                     disabled={busy}
                     className="mt-1"
                   >
@@ -459,59 +508,148 @@ export function DetailDrawer({
                 )}
               </section>
 
-              {/* Check-in / Room */}
-              {(p.roomId || p.checkInState === 'ARRIVED') && (
-                <>
-                  <Separator />
-                  <section className="space-y-2.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Check-in / Room
-                    </p>
-                    <Row
-                      label="Room"
-                      value={p.roomNumber ? `Room ${p.roomNumber}` : 'Checked in (no room)'}
-                    />
-                    {p.checkedInAt && (
-                      <Row label="Checked in at" value={fmtTs(p.checkedInAt)} />
-                    )}
-                    {p.checkedInBy && (
-                      <Row label="Checked in by" value={p.checkedInBy} />
-                    )}
-                    {p.roomAssignedAt && (
-                      <Row label="Room assigned at" value={fmtTs(p.roomAssignedAt)} />
-                    )}
-                    {p.roomAssignedBy && (
-                      <Row label="Room assigned by" value={p.roomAssignedBy} />
-                    )}
-                    {p.checkInState === 'ARRIVED' && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUndoCheckIn}
-                        disabled={busy}
-                      >
-                        Undo check-in
-                      </Button>
-                    )}
-                  </section>
-                </>
+              <Separator />
+
+              {/* Room assignment — always visible for REGISTERED participants */}
+              {p.registrationState === 'REGISTERED' && (
+                <section className="space-y-2.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Room assignment
+                  </p>
+
+                  {p.roomId ? (
+                    <>
+                      <Row label="Room" value={`Room ${p.roomNumber ?? p.roomId}`} />
+                      {p.roomAssignedAt && <Row label="Assigned at" value={fmtTs(p.roomAssignedAt)} />}
+                      {p.roomAssignedBy && <Row label="Assigned by" value={p.roomAssignedBy} />}
+                      {p.checkedInAt && <Row label="Checked in at" value={fmtTs(p.checkedInAt)} />}
+                      {p.checkedInBy && <Row label="Checked in by" value={p.checkedInBy} />}
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {/* Change Room button */}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={paymentState === 'PAID' || paymentState === 'WAIVED' ? 'default' : 'outline'}
+                          onClick={handleAssignRoomClick}
+                          disabled={busy}
+                          className={
+                            paymentState !== 'PAID' && paymentState !== 'WAIVED'
+                              ? 'border-amber-300 text-amber-800 hover:bg-amber-50 gap-1'
+                              : 'gap-1'
+                          }
+                        >
+                          {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
+                            <span>⚠️</span>
+                          )}
+                          <DoorOpen className="h-3.5 w-3.5" />
+                          Change Room
+                        </Button>
+
+                        {/* Unassign Room */}
+                        {confirmUnassign ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                              Unassign from Room {p.roomNumber}? They stay checked in.
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={handleUnassignRoom}
+                              disabled={busy}
+                            >
+                              Unassign
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmUnassign(false)}
+                            >
+                              Keep
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmUnassign(true)}
+                            disabled={busy}
+                            className="text-muted-foreground"
+                          >
+                            Unassign Room
+                          </Button>
+                        )}
+
+                        {/* Undo check-in (if checked in) */}
+                        {p.checkInState === 'ARRIVED' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleUndoCheckIn}
+                            disabled={busy}
+                          >
+                            Undo check-in
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {p.checkInState === 'ARRIVED' && (
+                        <Row label="Status" value="Checked in (no room assigned)" />
+                      )}
+                      {p.checkedInAt && <Row label="Checked in at" value={fmtTs(p.checkedInAt)} />}
+                      {p.checkedInBy && <Row label="Checked in by" value={p.checkedInBy} />}
+
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {/* Assign Room button */}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={paymentState === 'PAID' || paymentState === 'WAIVED' ? 'default' : 'outline'}
+                          onClick={handleAssignRoomClick}
+                          disabled={busy}
+                          className={
+                            paymentState !== 'PAID' && paymentState !== 'WAIVED'
+                              ? 'border-amber-300 text-amber-800 hover:bg-amber-50 gap-1'
+                              : 'gap-1'
+                          }
+                        >
+                          {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
+                            <span>⚠️</span>
+                          )}
+                          <DoorOpen className="h-3.5 w-3.5" />
+                          Assign Room
+                        </Button>
+
+                        {p.checkInState === 'ARRIVED' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleUndoCheckIn}
+                            disabled={busy}
+                          >
+                            Undo check-in
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </section>
               )}
 
               {/* Notes */}
               <Separator />
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Notes
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</p>
                   {!editingNotes && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setNotesText(p.notes ?? '')
-                        setEditingNotes(true)
-                      }}
+                      onClick={() => { setNotesText(p.notes ?? ''); setEditingNotes(true) }}
                       className="text-xs text-primary hover:underline disabled:opacity-50"
                       disabled={busy}
                     >
@@ -529,23 +667,13 @@ export function DetailDrawer({
                       className="text-sm"
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleSaveNotes} disabled={busy}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingNotes(false)}
-                      >
-                        Cancel
-                      </Button>
+                      <Button size="sm" onClick={handleSaveNotes} disabled={busy}>Save</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditingNotes(false)}>Cancel</Button>
                     </div>
                   </div>
                 ) : (
                   <p className="whitespace-pre-wrap text-sm">
-                    {p.notes || (
-                      <span className="text-muted-foreground">No notes</span>
-                    )}
+                    {p.notes || <span className="text-muted-foreground">No notes</span>}
                   </p>
                 )}
               </section>
@@ -553,9 +681,7 @@ export function DetailDrawer({
               {/* Audit */}
               <Separator />
               <section className="space-y-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Audit
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Audit</p>
                 <Row label="Registered at" value={fmtTs(p.createdAt)} />
                 <Row label="Last updated" value={fmtTs(p.updatedAt)} />
                 {p.updatedBy && <Row label="Updated by" value={p.updatedBy} />}
@@ -564,29 +690,16 @@ export function DetailDrawer({
               {/* Actions */}
               <Separator />
               <section className="space-y-2 pb-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Actions
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</p>
                 {p.registrationState === 'REGISTERED' ? (
                   confirmCancel ? (
                     <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
-                      <p className="text-sm text-destructive">
-                        Cancel this registration? This cannot be easily undone.
-                      </p>
+                      <p className="text-sm text-destructive">Cancel this registration? This cannot be easily undone.</p>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={handleCancel}
-                          disabled={busy}
-                        >
+                        <Button size="sm" variant="destructive" onClick={handleCancel} disabled={busy}>
                           Yes, cancel
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setConfirmCancel(false)}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmCancel(false)}>
                           Keep
                         </Button>
                       </div>
@@ -619,9 +732,7 @@ export function DetailDrawer({
 
             {/* Footer */}
             <div className="border-t px-6 py-4">
-              <Button variant="outline" className="w-full" onClick={onClose}>
-                Close
-              </Button>
+              <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
             </div>
 
             {/* Change Room Type Dialog */}
@@ -631,9 +742,7 @@ export function DetailDrawer({
                   <DialogTitle>Change room type preference</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Changing the room type will update the fee owed.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Changing the room type will update the fee owed.</p>
                   <div className="space-y-1.5 max-h-64 overflow-y-auto">
                     {roomTypes.map((rt) => (
                       <label
@@ -655,15 +764,12 @@ export function DetailDrawer({
                   </div>
                   {p && newRoomTypeFee !== undefined && newRoomTypeFee !== p.feeOwed && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                      Fee will change from {formatMoney(p.feeOwed, currency)} to{' '}
-                      {formatMoney(newRoomTypeFee, currency)}.
+                      Fee will change from {formatMoney(p.feeOwed, currency)} to {formatMoney(newRoomTypeFee, currency)}.
                     </div>
                   )}
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowRTModal(false)}>
-                    Cancel
-                  </Button>
+                  <Button variant="outline" onClick={() => setShowRTModal(false)}>Cancel</Button>
                   <Button
                     onClick={handleChangeRoomType}
                     disabled={busy || !selectedRTId || selectedRTId === p?.roomTypePreferenceId}
@@ -693,18 +799,35 @@ export function DetailDrawer({
                   />
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowWaiveModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleWaiveFee} disabled={busy || !waiverNote.trim()}>
-                    Waive fee
-                  </Button>
+                  <Button variant="outline" onClick={() => setShowWaiveModal(false)}>Cancel</Button>
+                  <Button onClick={handleWaiveFee} disabled={busy || !waiverNote.trim()}>Waive fee</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </>
         )}
       </div>
+
+      {/* Override payment modal — renders outside the panel so z-index is clean */}
+      {showOverrideModal && p && (
+        <OverridePaymentModal
+          participantName={p.fullName}
+          balanceDue={p.feeOwed - p.amountPaid}
+          currency={currency}
+          onCancel={() => setShowOverrideModal(false)}
+          onProceed={handleOverrideProceed}
+        />
+      )}
+
+      {/* Room picker modal */}
+      {showRoomPicker && p && (
+        <RoomPickerModal
+          participant={p}
+          overrideReason={pendingOverrideReason}
+          onAssigned={handleRoomAssigned}
+          onClose={() => { setShowRoomPicker(false); setPendingOverrideReason(null) }}
+        />
+      )}
     </>
   )
 }

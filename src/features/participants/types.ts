@@ -20,8 +20,11 @@ export interface Participant {
   roomAssignedBy?: string
   roomAssignedAt?: Timestamp
   amountPaid: number
+  roomedWithoutFullPayment?: boolean
+  roomedWithoutFullPaymentNote?: string
   checkedInBy?: string
   checkedInAt?: Timestamp
+  source?: 'self' | string
   tags: string[]
   feeWaiverNote?: string
   notes?: string

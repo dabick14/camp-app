@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -560,7 +560,15 @@ export function ParticipantListPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {p.roomNumber ? `Room ${p.roomNumber}` : '—'}
+                    <span className="flex items-center gap-1">
+                      {p.roomNumber ? `Room ${p.roomNumber}` : '—'}
+                      {p.roomedWithoutFullPayment && (
+                        <AlertTriangle
+                          className="h-3.5 w-3.5 shrink-0 text-destructive"
+                          title="Roomed with outstanding balance"
+                        />
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <TagsCell tags={p.tags ?? []} />
