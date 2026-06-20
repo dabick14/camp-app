@@ -563,10 +563,9 @@ export function ParticipantListPage() {
                     <span className="flex items-center gap-1">
                       {p.roomNumber ? `Room ${p.roomNumber}` : '—'}
                       {p.roomedWithoutFullPayment && (
-                        <AlertTriangle
-                          className="h-3.5 w-3.5 shrink-0 text-destructive"
-                          title="Roomed with outstanding balance"
-                        />
+                        <span title="Roomed with outstanding balance">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+                        </span>
                       )}
                     </span>
                   </TableCell>

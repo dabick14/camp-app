@@ -6,7 +6,6 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  deleteField,
   writeBatch,
   Timestamp,
   type FieldValue,

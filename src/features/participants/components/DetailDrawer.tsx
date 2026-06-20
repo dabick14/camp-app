@@ -141,7 +141,7 @@ export function DetailDrawer({
   // ─── mutation helper ─────────────────────────────────────────────────────────
 
   async function run(
-    fn: () => Promise<void>,
+    fn: () => Promise<unknown>,
     optimistic?: (prev: Participant) => Participant,
   ): Promise<boolean> {
     if (!p || !campId || busy) return false
