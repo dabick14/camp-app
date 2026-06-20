@@ -1,34 +1,25 @@
 import { useState } from 'react'
-import { signInWithEmailAndPassword } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function LoginForm() {
+export function LoginForm({
+  onSubmit,
+  error,
+  loading,
+}: {
+  onSubmit: (email: string, password: string) => void
+  error: string
+  loading: boolean
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      await signInWithEmailAndPassword(auth, email, password)
-      // Navigation handled by LoginPage's onAuthStateChanged listener
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code
-      setError(
-        code === 'auth/invalid-credential'
-          ? 'Invalid email or password.'
-          : 'Sign in failed. Please try again.',
-      )
-    } finally {
-      setLoading(false)
-    }
+    onSubmit(email, password)
   }
 
   return (
@@ -64,6 +55,11 @@ export function LoginForm() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
+            <p className="text-center text-sm">
+              <Link to="/login/reset" className="text-muted-foreground hover:text-foreground hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

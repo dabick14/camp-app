@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { formatDateRange } from '@/lib/dates'
 import { derivePaymentState } from '@/features/participants/types'
+import { LogoutButton } from '@/features/auth/LogoutButton'
 import { CampDataProvider, useCampData } from './CampDataContext'
 
 function MetricCard({ label, value }: { label: string; value: number }) {
@@ -57,16 +58,18 @@ function CampLayoutInner() {
               </p>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refresh}
-            disabled={loading}
-            title="Refresh data"
-            className="mt-0.5 shrink-0"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="mt-0.5 flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refresh}
+              disabled={loading}
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            <LogoutButton />
+          </div>
         </div>
 
         {/* Metric strip */}

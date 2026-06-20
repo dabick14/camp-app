@@ -8,8 +8,26 @@ service cloud.firestore {
     }
 
     match /admins/{uid} {
-      allow read: if isAdmin();
+      // Self existence-check: role detection (useUserRole) reads /admins/{uid}
+      // for EVERY signed-in user — including leaders — to decide if they're an
+      // admin. Without this, a leader's own read of their (non-existent) admin
+      // doc is denied outright by isAdmin() and throws, instead of resolving to
+      // exists() === false. Does not allow reading other users' admin docs.
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, get: if isAdmin();
       allow write: if false; // console-only — seeded manually
+    }
+
+    match /leaders/{uid} {
+      // Leaders can read their own doc (to know their subGroupId, etc.)
+      allow get: if request.auth != null && request.auth.uid == uid;
+      // Admins can read all leaders (for management UI in Day C)
+      allow list, get: if isAdmin();
+      // Only admins write; leaders can update their own lastLoginAt only
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (request.auth.uid == uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']));
     }
 
     match /camps/{campId} {

@@ -5,6 +5,8 @@
 ```
 /admins/{uid}
 
+/leaders/{uid}
+
 /camps/{campId}
   /subGroups/{subGroupId}
   /roomTypes/{roomTypeId}
@@ -24,6 +26,23 @@
   createdAt: Timestamp;
 }
 ```
+
+### `leaders/{uid}`
+```ts
+{
+  email: string;
+  displayName?: string;
+  campId: string;             // which camp this leader belongs to
+  subGroupId: string;         // which sub-group they lead — exactly one for v1
+  subGroupName: string;       // denormalized
+  active: boolean;            // admin can deactivate without deleting
+  createdAt: Timestamp;
+  createdBy: string;          // admin uid who provisioned them
+  updatedAt: Timestamp;
+  lastLoginAt?: Timestamp;    // updated on successful login
+}
+```
+Separate role and collection from `/admins/{uid}` — never merged or migrated. One leader per sub-group is enforced at write time (the create path checks no other `active: true` leader exists for that sub-group), not via schema — deactivated leaders don't block provisioning a replacement.
 
 ### `camps/{campId}`
 ```ts

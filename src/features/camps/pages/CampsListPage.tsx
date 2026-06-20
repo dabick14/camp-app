@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateRange } from '@/lib/dates'
+import { LogoutButton } from '@/features/auth/LogoutButton'
 import { listCamps } from '../services/campService'
 import type { Camp } from '../types'
 
@@ -25,12 +26,15 @@ export function CampsListPage() {
     <div className="mx-auto max-w-5xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Camps</h1>
-        <Button asChild>
-          <Link to="/admin/camps/new">
-            <PlusIcon className="mr-2 h-4 w-4" />
-            New camp
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild>
+            <Link to="/admin/camps/new">
+              <PlusIcon className="mr-2 h-4 w-4" />
+              New camp
+            </Link>
+          </Button>
+          <LogoutButton />
+        </div>
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}

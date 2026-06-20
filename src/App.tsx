@@ -2,7 +2,9 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { UserRoleProvider } from '@/features/auth/UserRoleContext'
 import { LoginPage } from '@/pages/LoginPage'
+import { PasswordResetPage } from '@/pages/PasswordResetPage'
 import { RegistrationPage } from '@/features/registration/RegistrationPage'
 import { ConfirmationPage } from '@/features/registration/ConfirmationPage'
 import { CampsListPage } from '@/features/camps/pages/CampsListPage'
@@ -15,7 +17,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { AdminAddParticipantPage } from '@/features/admin-add-participant/AdminAddParticipantPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  return <ProtectedRoute>{children}</ProtectedRoute>
+  return <ProtectedRoute requireRole="admin">{children}</ProtectedRoute>
 }
 
 function PaymentsPlaceholder() {
@@ -30,40 +32,43 @@ export default function App() {
   return (
     <TooltipProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Public */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/r/:campId" element={<RegistrationPage />} />
-          <Route path="/r/:campId/done" element={<ConfirmationPage />} />
+        <UserRoleProvider>
+          <Routes>
+            {/* Public */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login/reset" element={<PasswordResetPage />} />
+            <Route path="/r/:campId" element={<RegistrationPage />} />
+            <Route path="/r/:campId/done" element={<ConfirmationPage />} />
 
-          {/* Admin — list + new camp */}
-          <Route
-            path="/admin/camps"
-            element={<AdminRoute><CampsListPage /></AdminRoute>}
-          />
-          <Route
-            path="/admin/camps/new"
-            element={<AdminRoute><NewCampPage /></AdminRoute>}
-          />
+            {/* Admin — list + new camp */}
+            <Route
+              path="/admin/camps"
+              element={<AdminRoute><CampsListPage /></AdminRoute>}
+            />
+            <Route
+              path="/admin/camps/new"
+              element={<AdminRoute><NewCampPage /></AdminRoute>}
+            />
 
-          {/* Per-camp — all wrapped by CampLayout */}
-          <Route
-            path="/admin/camps/:id"
-            element={<AdminRoute><CampLayout /></AdminRoute>}
-          >
-            <Route index element={<ParticipantListPage />} />
-            <Route path="participants/new" element={<AdminAddParticipantPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="rooms" element={<RoomsPage />} />
-            <Route path="payments" element={<PaymentsPlaceholder />} />
-            <Route path="settings" element={<CampSettingsPage />} />
-          </Route>
+            {/* Per-camp — all wrapped by CampLayout */}
+            <Route
+              path="/admin/camps/:id"
+              element={<AdminRoute><CampLayout /></AdminRoute>}
+            >
+              <Route index element={<ParticipantListPage />} />
+              <Route path="participants/new" element={<AdminAddParticipantPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="rooms" element={<RoomsPage />} />
+              <Route path="payments" element={<PaymentsPlaceholder />} />
+              <Route path="settings" element={<CampSettingsPage />} />
+            </Route>
 
-          {/* Fallbacks */}
-          <Route path="/admin" element={<Navigate to="/admin/camps" replace />} />
-          <Route path="/" element={<Navigate to="/admin/camps" replace />} />
-        </Routes>
-        <Toaster />
+            {/* Fallbacks */}
+            <Route path="/admin" element={<Navigate to="/admin/camps" replace />} />
+            <Route path="/" element={<Navigate to="/admin/camps" replace />} />
+          </Routes>
+          <Toaster />
+        </UserRoleProvider>
       </BrowserRouter>
     </TooltipProvider>
   )
