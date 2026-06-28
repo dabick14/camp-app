@@ -11,5 +11,6 @@ export interface Leader {
   createdAt: Timestamp
   createdBy: string
   updatedAt: Timestamp
+  updatedBy?: string
   lastLoginAt?: Timestamp
 }

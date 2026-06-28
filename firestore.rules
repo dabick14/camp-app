@@ -7,6 +7,19 @@ service cloud.firestore {
           && exists(/databases/$(db)/documents/admins/$(request.auth.uid));
     }
 
+    // Cloud Firestore caches get()/exists() results per unique path for the
+    // duration of a single rule evaluation, so repeated calls to leaderDoc()
+    // below cost one read, not one per call site.
+    function leaderDoc() {
+      return get(/databases/$(db)/documents/leaders/$(request.auth.uid));
+    }
+
+    function isActiveLeader() {
+      return request.auth != null
+          && exists(/databases/$(db)/documents/leaders/$(request.auth.uid))
+          && leaderDoc().data.active == true;
+    }
+
     match /admins/{uid} {
       // Self existence-check: role detection (useUserRole) reads /admins/{uid}
       // for EVERY signed-in user — including leaders — to decide if they're an
@@ -21,13 +34,20 @@ service cloud.firestore {
     match /leaders/{uid} {
       // Leaders can read their own doc (to know their subGroupId, etc.)
       allow get: if request.auth != null && request.auth.uid == uid;
-      // Admins can read all leaders (for management UI in Day C)
+      // Admins can read all leaders (management UI)
       allow list, get: if isAdmin();
-      // Only admins write; leaders can update their own lastLoginAt only
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() ||
-        (request.auth.uid == uid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']));
+      // Created exclusively by the provisionLeader Cloud Function (Admin SDK
+      // bypasses rules) — the one-active-leader-per-sub-group check only runs
+      // there, so direct client creates are blocked even for admins.
+      allow create: if false;
+      allow delete: if isAdmin();
+      // Reactivating a leader is the same one-active-leader-per-sub-group
+      // hazard as creating one, and that check can't be expressed in rules
+      // (no cross-document query support) — so admins must go through the
+      // setLeaderActive Cloud Function for ANY update, same as create.
+      // Leaders may still self-update only their own lastLoginAt directly.
+      allow update: if request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']);
     }
 
     match /camps/{campId} {
@@ -48,11 +68,34 @@ service cloud.firestore {
         allow read, write: if isAdmin();
       }
 
+      match /paymentBatches/{batchId} {
+        // Admin-only — no public-read carve-out. An earlier spec planned a
+        // public `allow get: if true` here so the public registration form
+        // could check reconciliation client-side; that rule was never
+        // actually deployed, and the public form itself was removed in the
+        // post-Day-C cleanup. The reconciliation gate now lives entirely
+        // server-side in leaderRegisterParticipant (Admin SDK, bypasses
+        // rules), so there's no reason for any non-admin read access.
+        allow read, write: if isAdmin();
+      }
+
       match /participants/{participantId} {
         allow read, update, delete: if isAdmin();
 
-        // Participant creation is handled exclusively by the registerParticipant
-        // Cloud Function (admin SDK bypasses rules). No direct client writes allowed.
+        // Leaders may read only participants in their own sub-group, within
+        // their own camp. For `list` to succeed, the client query must filter
+        // on subGroupId (and implicitly campId via the collection path) so
+        // Firestore can prove every possible result satisfies this condition
+        // — an unscoped query is rejected outright, not silently filtered.
+        allow get, list: if isActiveLeader()
+            && leaderDoc().data.campId == campId
+            && resource.data.subGroupId == leaderDoc().data.subGroupId;
+
+        // Participant creation is handled exclusively by Cloud Functions
+        // (adminAddParticipant, leaderRegisterParticipant — both use the
+        // Admin SDK, which bypasses rules). No direct client writes allowed,
+        // including from leaders. The public self-select flow's function,
+        // registerParticipant, was retired and removed post-Day-C.
         allow create: if false;
       }
     }

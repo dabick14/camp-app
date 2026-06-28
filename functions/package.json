@@ -4,17 +4,22 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "npx firebase-tools@latest emulators:exec --only firestore \"vitest run\""
   },
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "main": "lib/index.js",
   "dependencies": {
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^6.0.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@types/node": "^20.0.0",
     "typescript": "^5.3.3",
-    "@types/node": "^20.0.0"
+    "vitest": "^4.1.9"
   },
   "private": true
 }
