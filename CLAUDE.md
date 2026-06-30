@@ -116,6 +116,13 @@ No tiered roles. No attendee self-service. No leader portal.
 - Feature folders: `src/features/{feature}/`.
 - No state machine library.
 
+## Secrets
+- Never hardcode API keys, tokens, or credentials as literal strings in source — including ones that "aren't really secret" (e.g. Firebase Web API keys). Read them from environment variables instead.
+  - Client (`src/`): `import.meta.env.VITE_*`, sourced from `.env.local` (gitignored; `.env.example` documents the shape, committed).
+  - Functions (`functions/`): `process.env.*`, sourced from `functions/.env` (gitignored; `functions/.env.example` documents the shape, committed).
+- If GitHub (or any scanner) flags a committed secret: rotating/revoking the credential in its origin console is the actual fix, not just removing it from the current file — the old value still lives in git history once pushed.
+- True secrets (third-party API keys with real access, service account keys) get the same env-var treatment at minimum; for anything Cloud Functions need at runtime, prefer `firebase-functions/params`'s `defineSecret` (Secret Manager) over a plain `.env` value.
+
 ## When in doubt
 - Cut features rather than add them.
 - Choose boring over clever.

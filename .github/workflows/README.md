@@ -43,6 +43,14 @@ These are baked into the frontend bundle at build time. Use production values, n
 
 > **`VITE_APPCHECK_DEBUG_TOKEN` is intentionally absent from CI.** That token bypasses App Check enforcement and is for local dev only. The production build uses the real reCAPTCHA provider.
 
+### Cloud Functions runtime env vars (used by `deploy-functions` only)
+
+Written to `functions/.env` on the runner right before deploy (that file is gitignored locally — CI has no other way to get it). Firebase CLI picks up `functions/.env` automatically at deploy time and sets it as the function's runtime environment.
+
+| Secret | Value |
+|---|---|
+| `WEB_API_KEY` | Same value as `VITE_FIREBASE_API_KEY` above — Firebase Console → Project Settings → General → Web API Key. Used by `provisionLeader` to trigger Identity Toolkit's password-reset email. |
+
 ---
 
 ## Triggering a manual deploy

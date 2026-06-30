@@ -2,11 +2,15 @@ import { onRequest } from 'firebase-functions/v2/https'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 
-// Public Firebase Web API key (same one as VITE_FIREBASE_API_KEY in the client
-// bundle — not a secret). Needed to trigger Identity Toolkit's hosted
+// Firebase Web API key (same value as VITE_FIREBASE_API_KEY in the client
+// bundle — Firebase Web API keys are not secret by design, they're meant to
+// ship in client code). Needed to trigger Identity Toolkit's hosted
 // password-reset email; the Admin SDK can generate a reset link but has no
 // equivalent for actually sending it.
-const WEB_API_KEY = 'AIzaSyDAW94CNt2Hxdgh0Ee69bzGUY05a3DGgBY'
+// Read from env (functions/.env, gitignored) rather than hardcoded — not
+// because this value is sensitive, but to stop literal API-key strings from
+// sitting in source and tripping secret scanners. See functions/.env.example.
+const WEB_API_KEY = process.env.WEB_API_KEY
 
 interface ProvisionLeaderData {
   campId: string
@@ -56,6 +60,11 @@ export const provisionLeader = onRequest({ cors: true }, async (req, res) => {
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.status(400).json({ error: 'Enter a valid email address' })
+    return
+  }
+  if (!WEB_API_KEY) {
+    console.error('provisionLeader: WEB_API_KEY env var is not set — see functions/.env.example')
+    res.status(500).json({ error: 'Server misconfiguration. Please contact support.' })
     return
   }
 

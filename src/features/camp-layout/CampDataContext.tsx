@@ -39,6 +39,9 @@ export function CampDataProvider({
 
   const refresh = useCallback(() => setRefreshCount((c) => c + 1), [])
 
+  // Track when the last successful fetch completed so focus-refresh can skip if data is fresh
+  const lastFetchAt = useRef(0)
+
   // Stale-request guard: track which fetch generation is current
   const genRef = useRef(0)
 
@@ -62,6 +65,7 @@ export function CampDataProvider({
         setRooms(rms)
         setParticipants(parts)
         setLoading(false)
+        lastFetchAt.current = Date.now()
       })
       .catch((err: Error) => {
         if (gen !== genRef.current) return
@@ -71,8 +75,11 @@ export function CampDataProvider({
   }, [campId, refreshCount])
 
   useEffect(() => {
-    window.addEventListener('focus', refresh)
-    return () => window.removeEventListener('focus', refresh)
+    const handleFocus = () => {
+      if (Date.now() - lastFetchAt.current > 60_000) refresh()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [refresh])
 
   return (

@@ -97,6 +97,11 @@ jobs:
           SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: echo "$SA_KEY" > /tmp/firebase-sa.json
 
+      - name: Write functions .env
+        env:
+          WEB_API_KEY: ${{ secrets.WEB_API_KEY }}
+        run: echo "WEB_API_KEY=$WEB_API_KEY" > functions/.env
+
       - name: Deploy Cloud Functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
