@@ -30,9 +30,11 @@ export const adminAddParticipant = onRequest({ cors: true }, async (req, res) =>
   const idToken = authHeader.slice(7)
 
   let uid: string
+  let displayName: string
   try {
     const decoded = await getAuth().verifyIdToken(idToken)
     uid = decoded.uid
+    displayName = decoded.email ?? uid
   } catch {
     res.status(401).json({ error: 'Invalid token' })
     return
@@ -161,7 +163,7 @@ export const adminAddParticipant = onRequest({ cors: true }, async (req, res) =>
       checkInState: 'NOT_ARRIVED',
       tags: [],
       roomId: null,
-      updatedBy: uid,
+      updatedBy: displayName,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }

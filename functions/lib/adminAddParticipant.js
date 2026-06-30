@@ -5,7 +5,7 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
 exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
@@ -18,11 +18,13 @@ exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
     }
     const idToken = authHeader.slice(7);
     let uid;
+    let displayName;
     try {
         const decoded = await (0, auth_1.getAuth)().verifyIdToken(idToken);
         uid = decoded.uid;
+        displayName = (_a = decoded.email) !== null && _a !== void 0 ? _a : uid;
     }
-    catch (_e) {
+    catch (_f) {
         res.status(401).json({ error: 'Invalid token' });
         return;
     }
@@ -35,7 +37,7 @@ exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
     }
     const data = req.body;
     const { campId, fullName, phone, gender, subGroupId, roomTypePreferenceId } = data;
-    const acknowledged = (_a = data.acknowledgedDuplicates) !== null && _a !== void 0 ? _a : [];
+    const acknowledged = (_b = data.acknowledgedDuplicates) !== null && _b !== void 0 ? _b : [];
     if (!campId || !(fullName === null || fullName === void 0 ? void 0 : fullName.trim()) || !(phone === null || phone === void 0 ? void 0 : phone.trim()) || !gender || !subGroupId || !roomTypePreferenceId) {
         res.status(400).json({ error: 'Missing required fields' });
         return;
@@ -101,7 +103,7 @@ exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
             }
         }
         // Layer 3: Email soft check
-        if (!acknowledged.includes('DUPLICATE_EMAIL') && ((_b = data.email) === null || _b === void 0 ? void 0 : _b.trim())) {
+        if (!acknowledged.includes('DUPLICATE_EMAIL') && ((_c = data.email) === null || _c === void 0 ? void 0 : _c.trim())) {
             const emailLower = data.email.trim().toLowerCase();
             const emailSnap = await participantsRef
                 .where('emailLower', '==', emailLower)
@@ -130,11 +132,11 @@ exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
             checkInState: 'NOT_ARRIVED',
             tags: [],
             roomId: null,
-            updatedBy: uid,
+            updatedBy: displayName,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
         };
-        if ((_c = data.email) === null || _c === void 0 ? void 0 : _c.trim()) {
+        if ((_d = data.email) === null || _d === void 0 ? void 0 : _d.trim()) {
             participant.email = data.email.trim();
             participant.emailLower = data.email.trim().toLowerCase();
         }
@@ -150,7 +152,7 @@ exports.adminAddParticipant = (0, https_1.onRequest)({ cors: true }, async (req,
             subGroupName,
             roomTypePreferenceName,
             feeOwed,
-            currency: (_d = camp.currency) !== null && _d !== void 0 ? _d : 'GHS',
+            currency: (_e = camp.currency) !== null && _e !== void 0 ? _e : 'GHS',
             campName: camp.name,
         });
     }

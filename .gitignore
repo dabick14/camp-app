@@ -33,3 +33,4 @@ service-account-key.json
 *-service-account*.json
 *-serviceaccount*.json
 firebase-adminsdk-*.json
+scripts/probe-scale.ts

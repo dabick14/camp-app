@@ -79,6 +79,12 @@ service cloud.firestore {
         allow read, write: if isAdmin();
       }
 
+      match /allocations/{allocationId} {
+        // Admin-only — allocations are created/voided by admins; the gate
+        // check in leaderRegisterParticipant uses the Admin SDK (bypasses rules).
+        allow read, write: if isAdmin();
+      }
+
       match /participants/{participantId} {
         allow read, update, delete: if isAdmin();
 
@@ -91,11 +97,21 @@ service cloud.firestore {
             && leaderDoc().data.campId == campId
             && resource.data.subGroupId == leaderDoc().data.subGroupId;
 
+        // Leaders may directly update ONLY the payment claim fields on
+        // participants in their own sub-group. All other fields — including
+        // amountPaid, roomId, checkInState, registrationState — are blocked.
+        // The preferred write path is the setPaymentClaim Cloud Function
+        // (Admin SDK, bypasses rules), but this rule adds defense-in-depth
+        // so even a crafted direct write can't touch amountPaid or rooming.
+        allow update: if isActiveLeader()
+            && leaderDoc().data.campId == campId
+            && resource.data.subGroupId == leaderDoc().data.subGroupId
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['paymentClaimed', 'claimedBy', 'claimedAt', 'updatedAt', 'updatedBy']);
+
         // Participant creation is handled exclusively by Cloud Functions
         // (adminAddParticipant, leaderRegisterParticipant — both use the
-        // Admin SDK, which bypasses rules). No direct client writes allowed,
-        // including from leaders. The public self-select flow's function,
-        // registerParticipant, was retired and removed post-Day-C.
+        // Admin SDK, which bypasses rules). No direct client creates allowed.
         allow create: if false;
       }
     }

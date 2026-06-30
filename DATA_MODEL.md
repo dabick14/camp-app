@@ -155,8 +155,24 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   roomAssignedBy?: string;
   roomAssignedAt?: Timestamp;
 
-  // Cached payment total
+  // Cached payment total — admin-confirmed only; never written by leaders directly.
+  // Updated only when admin reconciles/confirms a leader's payment claims (5b-ii).
   amountPaid: number;              // default 0
+
+  // ── Claim layer (5b-i) ────────────────────────────────────────────────────
+  // A leader marks paymentClaimed: true to assert "this person has paid me."
+  // This is a pre-confirmation signal ONLY. It does NOT affect amountPaid,
+  // paymentState, or rooming eligibility. Admin confirmation (5b-ii, not yet
+  // built) is the step that reads these claims and actually updates amountPaid.
+  //
+  // Design constraint: claim is binary (no amount) because the leader knows
+  // who paid, not how much — the batch lump-sum amount is reconciled centrally.
+  //
+  // The old CSV-allocation model (leader fills amountPaid per row, admin
+  // uploads) is superseded by this claim layer. See PAYMENTS_SPEC.md.
+  paymentClaimed?: boolean;        // default absent / false
+  claimedBy?: string;              // leader uid who set the claim
+  claimedAt?: Timestamp;           // set on claim, cleared (field deleted) on unclaim
 
   // Audit-only override flag
   // Set when admin assigns a room to a non-PAID/WAIVED participant.

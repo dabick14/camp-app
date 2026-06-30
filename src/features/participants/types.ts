@@ -20,6 +20,11 @@ export interface Participant {
   roomAssignedBy?: string
   roomAssignedAt?: Timestamp
   amountPaid: number
+  // Claim layer: leader asserts "this person paid me". Does NOT affect
+  // amountPaid or paymentState — admin confirmation (5b-ii) does that.
+  paymentClaimed?: boolean
+  claimedBy?: string
+  claimedAt?: Timestamp
   roomedWithoutFullPayment?: boolean
   roomedWithoutFullPaymentNote?: string
   checkedInBy?: string

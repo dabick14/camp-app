@@ -8,16 +8,17 @@ const firestore_1 = require("firebase-admin/firestore");
 // before the handler ever runs (no manual Bearer-token parsing needed,
 // and no way to forge it the way a raw HTTP body can be tampered with).
 exports.leaderRegisterParticipant = (0, https_1.onCall)(async (request) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Sign in required.');
     }
     const uid = request.auth.uid;
+    const displayName = (_a = request.auth.token.email) !== null && _a !== void 0 ? _a : uid;
     const db = (0, firestore_1.getFirestore)();
     // Caller must be an active leader — admins and deactivated/non-leaders are
     // rejected. Admins use adminAddParticipant instead.
     const leaderSnap = await db.doc(`leaders/${uid}`).get();
-    if (!leaderSnap.exists || ((_a = leaderSnap.data()) === null || _a === void 0 ? void 0 : _a.active) !== true) {
+    if (!leaderSnap.exists || ((_b = leaderSnap.data()) === null || _b === void 0 ? void 0 : _b.active) !== true) {
         throw new https_1.HttpsError('permission-denied', 'Not an active leader');
     }
     const leader = leaderSnap.data();
@@ -33,7 +34,7 @@ exports.leaderRegisterParticipant = (0, https_1.onCall)(async (request) => {
     // absence of subGroupId/subGroupName/campId here — this is intentional,
     // not an oversight, and is the property the tamper test asserts on.
     const { fullName, phone, gender, roomTypePreferenceId, email, dateOfBirth, age } = request.data;
-    const acknowledged = (_b = request.data.acknowledgedDuplicates) !== null && _b !== void 0 ? _b : [];
+    const acknowledged = (_c = request.data.acknowledgedDuplicates) !== null && _c !== void 0 ? _c : [];
     if (!(fullName === null || fullName === void 0 ? void 0 : fullName.trim()) || !(phone === null || phone === void 0 ? void 0 : phone.trim()) || !gender || !roomTypePreferenceId) {
         throw new https_1.HttpsError('invalid-argument', 'Missing required fields');
     }
@@ -142,7 +143,7 @@ exports.leaderRegisterParticipant = (0, https_1.onCall)(async (request) => {
         tags: [],
         roomId: null,
         source: uid,
-        updatedBy: uid,
+        updatedBy: displayName,
         createdAt: firestore_1.FieldValue.serverTimestamp(),
         updatedAt: firestore_1.FieldValue.serverTimestamp(),
     };
@@ -162,7 +163,7 @@ exports.leaderRegisterParticipant = (0, https_1.onCall)(async (request) => {
         subGroupName,
         roomTypePreferenceName,
         feeOwed,
-        currency: (_c = camp.currency) !== null && _c !== void 0 ? _c : 'GHS',
+        currency: (_d = camp.currency) !== null && _d !== void 0 ? _d : 'GHS',
         campName: camp.name,
     };
 });

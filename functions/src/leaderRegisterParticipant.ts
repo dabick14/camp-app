@@ -21,6 +21,7 @@ export const leaderRegisterParticipant = onCall<LeaderRegisterParticipantData>(a
     throw new HttpsError('unauthenticated', 'Sign in required.')
   }
   const uid = request.auth.uid
+  const displayName = request.auth.token.email ?? uid
 
   const db = getFirestore()
 
@@ -195,7 +196,7 @@ export const leaderRegisterParticipant = onCall<LeaderRegisterParticipantData>(a
     tags: [],
     roomId: null,
     source: uid,
-    updatedBy: uid,
+    updatedBy: displayName,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }

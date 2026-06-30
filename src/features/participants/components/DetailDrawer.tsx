@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
 import { DoorOpen, X, Plus } from 'lucide-react'
@@ -18,6 +18,11 @@ import {
 } from '@/components/ui/dialog'
 import { formatMoney } from '@/lib/formatMoney'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
+import {
+  listAllocationsByParticipant,
+  voidAllocation,
+} from '@/features/payments/services/allocationService'
+import type { Allocation } from '@/features/payments/types'
 import {
   cancelRegistration,
   restoreRegistration,
@@ -105,6 +110,45 @@ export function DetailDrawer({
 
   const p = local
   const paymentState = p ? derivePaymentState(p) : null
+
+  // ─── allocations ─────────────────────────────────────────────────────────────
+  const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [voidTarget, setVoidTarget] = useState<Allocation | null>(null)
+  const [voidReason, setVoidReason] = useState('')
+  const [voiding, setVoiding] = useState(false)
+
+  const loadAllocations = useCallback(async () => {
+    if (!campId || !participant) return
+    try {
+      const allocs = await listAllocationsByParticipant(campId, participant.id)
+      allocs.sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
+      setAllocations(allocs)
+    } catch {
+      // non-fatal; don't block the drawer
+    }
+  }, [campId, participant])
+
+  useEffect(() => {
+    if (participant) loadAllocations()
+    else setAllocations([])
+  }, [participant, loadAllocations])
+
+  async function handleVoidAllocation() {
+    if (!voidTarget || !campId || !voidReason.trim()) return
+    setVoiding(true)
+    try {
+      await voidAllocation(campId, voidTarget.id, voidReason, getUpdatedBy())
+      toast.success('Allocation voided')
+      setVoidTarget(null)
+      setVoidReason('')
+      await loadAllocations()
+      onMutated() // refreshes amountPaid in the parent list
+    } catch (err) {
+      toast.error((err as Error).message ?? 'Failed to void')
+    } finally {
+      setVoiding(false)
+    }
+  }
 
   // ─── UI state ───────────────────────────────────────────────────────────────
   const [busy, setBusy] = useState(false)
@@ -506,6 +550,43 @@ export function DetailDrawer({
                     Waive fee
                   </Button>
                 )}
+
+                {/* Allocations list */}
+                {allocations.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Allocations</p>
+                    {allocations.map((a) => (
+                      <div
+                        key={a.id}
+                        className={`flex items-center justify-between rounded border px-2.5 py-1.5 text-xs ${
+                          a.voided ? 'opacity-50' : ''
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="font-mono">{a.batchReferenceCode}</span>
+                          {a.voided && (
+                            <span className="ml-2 text-muted-foreground">voided</span>
+                          )}
+                        </div>
+                        <div className="ml-3 flex shrink-0 items-center gap-2">
+                          <span className="tabular-nums font-medium">
+                            {formatMoney(a.amount, currency)}
+                          </span>
+                          {!a.voided && (
+                            <button
+                              type="button"
+                              onClick={() => { setVoidTarget(a); setVoidReason('') }}
+                              className="text-muted-foreground hover:text-destructive"
+                              disabled={busy}
+                            >
+                              Void
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <Separator />
@@ -775,6 +856,42 @@ export function DetailDrawer({
                     disabled={busy || !selectedRTId || selectedRTId === p?.roomTypePreferenceId}
                   >
                     Confirm change
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Void Allocation Dialog */}
+            <Dialog open={!!voidTarget} onOpenChange={(v) => !v && setVoidTarget(null)}>
+              <DialogContent showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>Void allocation</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Void {voidTarget ? formatMoney(voidTarget.amount, currency) : ''} from{' '}
+                    <span className="font-mono">{voidTarget?.batchReferenceCode}</span>?
+                    This decrements this participant's amountPaid and the batch total.
+                    If the batch was reconciled it will reopen.
+                  </p>
+                  <Textarea
+                    value={voidReason}
+                    onChange={(e) => setVoidReason(e.target.value)}
+                    placeholder="Reason for voiding…"
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setVoidTarget(null)} disabled={voiding}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleVoidAllocation}
+                    disabled={voiding || !voidReason.trim()}
+                  >
+                    {voiding ? 'Voiding…' : 'Void allocation'}
                   </Button>
                 </DialogFooter>
               </DialogContent>

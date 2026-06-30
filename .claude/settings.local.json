@@ -18,7 +18,9 @@
       "Bash(grep -i '\\\\.md$')",
       "Bash(firebase deploy *)",
       "Bash(GOOGLE_APPLICATION_CREDENTIALS=\"$\\(pwd\\)/service-account-key.json\" npx tsx /private/tmp/claude-501/-Users-daviddagvanderpuije-dev-flstuff-camp-app/3b79e5bd-024c-4295-a537-aa49ba3f184f/scratchpad/probe.ts pC8M45Kj9SQKNLOsd7aP)",
-      "Bash(GOOGLE_APPLICATION_CREDENTIALS=\"$\\(pwd\\)/service-account-key.json\" npx tsx scripts/probe-scale.ts pC8M45Kj9SQKNLOsd7aP)"
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=\"$\\(pwd\\)/service-account-key.json\" npx tsx scripts/probe-scale.ts pC8M45Kj9SQKNLOsd7aP)",
+      "Bash(npx firebase-tools@latest deploy --only functions)",
+      "Bash(npm test *)"
     ],
     "additionalDirectories": [
       "/Users/daviddagvanderpuije/dev/flstuff/camp-app",

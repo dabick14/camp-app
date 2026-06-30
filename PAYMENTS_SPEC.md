@@ -3,6 +3,29 @@
 ## Two-layer reality
 Participants pay sub-group leaders (informal, opaque). Leaders pay central admin in **lump sums** via MoMo. System models layer 2.
 
+## ⚠️ Design revision (5b-i) — claim layer replaces CSV-allocation as the primary signal
+
+The CSV-allocation model below (steps 2–4: generate roster → leader fills amountPaid → admin uploads) describes how `amountPaid` gets confirmed. That flow **still applies** for admin reconciliation (5b-ii, not yet built), but **leaders no longer fill in per-person amounts on a CSV**. Instead:
+
+### Claim layer (built in 5b-i)
+Leaders mark who paid via an in-system roster screen. Per participant, it is binary: **Paid / Not paid** — no amounts, because the leader handles lump sums, not per-person accounting. The system captures this as:
+
+```ts
+paymentClaimed: boolean     // leader's assertion
+claimedBy: string           // leader uid
+claimedAt: Timestamp
+```
+
+**Critical constraint:** `paymentClaimed` is a signal, NOT a confirmation. It does not change `amountPaid`, `paymentState`, or rooming eligibility. The leader's roster gives admin a pre-sorted list to reconcile against the lump-sum batch. Admin confirmation (5b-ii) is the step that reads these claims and updates `amountPaid`.
+
+**Write path:** `setPaymentClaim` Cloud Function (callable). Leader auth, sub-group scoped server-side. Leaders cannot write `amountPaid` or any rooming field — blocked by Firestore rules.
+
+### Revised two-step flow
+1. **Leader claims** (5b-i — this phase): leader opens roster, taps "Mark paid" per person who handed them money. Running total shows what lump sum to expect.
+2. **Admin confirms** (5b-ii — future): admin opens batch, sees claimed participants, confirms or adjusts amounts → updates `amountPaid` → unlocks rooming.
+
+The batch and allocation data model below is unchanged — it's still the confirmation layer. Steps 2–4 in "Batch lifecycle" will be replaced by the confirmation UI in 5b-ii.
+
 ## Core entities
 - **PaymentBatch** — lump sum received from a sub-group. Has reference code and OPEN/RECONCILED status.
 - **Allocation** — record that money from a batch covers a specific participant's fee. Immutable (voided allocations leave an audit row).

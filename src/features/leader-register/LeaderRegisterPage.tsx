@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { httpsCallable } from 'firebase/functions'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
+import { ClipboardList, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -305,6 +307,21 @@ export function LeaderRegisterPage() {
           <p className="mt-1 text-sm text-muted-foreground">{camp?.location}</p>
         </div>
         <LogoutButton />
+      </div>
+
+      {/* Nav between leader screens */}
+      <div className="mb-6 flex gap-2 border-b pb-4">
+        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-sm font-medium">
+          <UserPlus className="h-4 w-4" />
+          Register
+        </span>
+        <Link
+          to="/leader/roster"
+          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        >
+          <ClipboardList className="h-4 w-4" />
+          Payment roster
+        </Link>
       </div>
 
       <div className="mb-6 rounded-md border bg-muted/40 px-4 py-3">
