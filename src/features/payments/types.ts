@@ -32,6 +32,9 @@ export interface PaymentBatch {
   notes?: string
   status: BatchStatus
   varianceAcknowledged: boolean
+  varianceNote?: string
+  reopenedAt?: Timestamp
+  reopenedBy?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }

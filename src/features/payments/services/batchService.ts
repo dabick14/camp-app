@@ -7,10 +7,13 @@ import {
   runTransaction,
   serverTimestamp,
   Timestamp,
+  query,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { generateReferenceCode } from '../types'
 import type { PaymentBatch, PaymentMethod } from '../types'
+import type { Participant } from '@/features/participants/types'
 
 function batchesRef(campId: string) {
   return collection(db, 'camps', campId, 'paymentBatches')
@@ -18,6 +21,10 @@ function batchesRef(campId: string) {
 
 function batchRef(campId: string, batchId: string) {
   return doc(db, 'camps', campId, 'paymentBatches', batchId)
+}
+
+function participantRef(campId: string, participantId: string) {
+  return doc(db, 'camps', campId, 'participants', participantId)
 }
 
 export async function listBatches(campId: string): Promise<PaymentBatch[]> {
@@ -97,22 +104,11 @@ export async function updateBatchMetadata(
   await updateDoc(batchRef(campId, batchId), patch)
 }
 
-export async function markReconciled(
-  campId: string,
-  batchId: string,
-  uid: string,
-): Promise<void> {
-  await updateDoc(batchRef(campId, batchId), {
-    status: 'RECONCILED',
-    updatedAt: serverTimestamp(),
-    updatedBy: uid,
-  })
-}
-
 /**
- * Reconciles a batch with a known variance (allocated ≠ received).
- * Sets varianceAcknowledged: true so it is clear the admin explicitly accepted
- * the discrepancy. Requires a note explaining the variance.
+ * Reconciles a batch with a known variance (claimed sum ≠ received).
+ * Sets varianceAcknowledged: true. Does NOT confirm any participants — they
+ * remain claimed-but-unconfirmed and therefore unroomable. Use the per-person
+ * override (Day 4c) if you must room someone before the variance is resolved.
  */
 export async function reconcileWithVariance(
   campId: string,
@@ -131,11 +127,100 @@ export async function reconcileWithVariance(
 }
 
 /**
+ * Reconciles an OPEN batch and confirms all claimed-but-unconfirmed participants
+ * in the batch's sub-group as PAID, in a single atomic transaction.
+ *
+ * Guards:
+ * - Batch must be OPEN
+ * - Every ID in claimedParticipantIds must exist, belong to the batch's
+ *   sub-group, still be claimed, and not yet confirmed
+ * - Σ feeOwed of those participants must exactly equal batch.amountReceived
+ *
+ * On success:
+ * - Each participant gets amountPaid = feeOwed, confirmedAt, confirmedBy,
+ *   confirmedBatchId (making them PAID via the existing derivePaymentState)
+ * - Batch gets status = 'RECONCILED', amountAllocated = amountReceived
+ *
+ * Un-confirming confirmed participants is out of scope for v1 (Phase 2).
+ */
+export async function reconcileAndConfirm(
+  campId: string,
+  batchId: string,
+  claimedParticipantIds: string[],
+  uid: string,
+): Promise<void> {
+  if (claimedParticipantIds.length === 0) {
+    throw new Error('No claimed participants to confirm')
+  }
+
+  await runTransaction(db, async (tx) => {
+    // ── READ PHASE ────────────────────────────────────────────────────────────
+    const batchSnap = await tx.get(batchRef(campId, batchId))
+    if (!batchSnap.exists()) throw new Error('Batch not found')
+    const batchData = batchSnap.data() as PaymentBatch
+    if (batchData.status !== 'OPEN') throw new Error('Batch is not OPEN')
+
+    const participantSnaps = await Promise.all(
+      claimedParticipantIds.map((id) => tx.get(participantRef(campId, id))),
+    )
+
+    let expectedSum = 0
+    for (let i = 0; i < participantSnaps.length; i++) {
+      const snap = participantSnaps[i]
+      if (!snap.exists()) {
+        throw new Error(`Participant ${claimedParticipantIds[i]} not found`)
+      }
+      const p = snap.data() as Participant
+      if (p.subGroupId !== batchData.subGroupId) {
+        throw new Error(`Participant ${claimedParticipantIds[i]} belongs to a different sub-group`)
+      }
+      if (!p.paymentClaimed) {
+        throw new Error(`Participant ${claimedParticipantIds[i]} is no longer claimed`)
+      }
+      if (p.confirmedBatchId) {
+        throw new Error(`Participant ${claimedParticipantIds[i]} is already confirmed`)
+      }
+      expectedSum += p.feeOwed
+    }
+
+    if (expectedSum !== batchData.amountReceived) {
+      throw new Error(
+        `Amount mismatch: claimed participants owe ${expectedSum} but batch received ${batchData.amountReceived}. ` +
+          `Use "Reconcile with Variance" instead.`,
+      )
+    }
+
+    // ── WRITE PHASE ───────────────────────────────────────────────────────────
+    const now = serverTimestamp()
+    for (let i = 0; i < participantSnaps.length; i++) {
+      const p = participantSnaps[i].data() as Participant
+      tx.update(participantRef(campId, claimedParticipantIds[i]), {
+        amountPaid: p.feeOwed,
+        confirmedAt: now,
+        confirmedBy: uid,
+        confirmedBatchId: batchId,
+        updatedAt: now,
+        updatedBy: uid,
+      })
+    }
+
+    tx.update(batchRef(campId, batchId), {
+      status: 'RECONCILED',
+      amountAllocated: batchData.amountReceived,
+      updatedAt: now,
+      updatedBy: uid,
+    })
+  })
+}
+
+/**
  * Reopens a RECONCILED batch.
  *
  * Guard: only acts if batch is currently RECONCILED; throws if already OPEN.
  * INVARIANT: clears varianceAcknowledged: false in the same write, so the
  * field is never stale-true on an open batch.
+ * NOTE: confirmed participants are NOT un-confirmed when a batch is reopened —
+ * un-confirming is out of scope for v1 (Phase 2).
  */
 export async function reopenBatch(
   campId: string,
@@ -156,5 +241,25 @@ export async function reopenBatch(
       updatedAt: serverTimestamp(),
       updatedBy: uid,
     })
+  })
+}
+
+/**
+ * Returns true if the sub-group's registration is currently gated:
+ * i.e. it has at least one OPEN batch with unallocated balance > 0.
+ * Mirrors the server-side gate in leaderRegisterParticipant (which is the
+ * authoritative integrity check). This is a client-side pre-check for UX only.
+ */
+export async function isSubGroupGated(campId: string, subGroupId: string): Promise<boolean> {
+  const snap = await getDocs(
+    query(
+      batchesRef(campId),
+      where('subGroupId', '==', subGroupId),
+      where('status', '==', 'OPEN'),
+    ),
+  )
+  return snap.docs.some((d) => {
+    const b = d.data()
+    return (b.amountReceived as number) - (b.amountAllocated as number) > 0
   })
 }

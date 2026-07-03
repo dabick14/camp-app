@@ -155,9 +155,9 @@ function TagsCell({ tags }: { tags: string[] }) {
   if (tags.length === 0) return <span className="text-xs text-muted-foreground">—</span>
   return (
     <div className="flex flex-wrap gap-1">
-      {visible.map((tag) => (
+      {visible.map((tag, i) => (
         <span
-          key={tag}
+          key={`${tag}-${i}`}
           className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium"
         >
           {tag}

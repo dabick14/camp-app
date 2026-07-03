@@ -69,14 +69,19 @@ service cloud.firestore {
       }
 
       match /paymentBatches/{batchId} {
-        // Admin-only — no public-read carve-out. An earlier spec planned a
-        // public `allow get: if true` here so the public registration form
-        // could check reconciliation client-side; that rule was never
-        // actually deployed, and the public form itself was removed in the
-        // post-Day-C cleanup. The reconciliation gate now lives entirely
-        // server-side in leaderRegisterParticipant (Admin SDK, bypasses
-        // rules), so there's no reason for any non-admin read access.
+        // Admin full access.
         allow read, write: if isAdmin();
+
+        // Leaders may list/get batches scoped to their own sub-group so the
+        // leader registration page can check for an unreconciled batch BEFORE
+        // rendering the form (UX pre-check only — the authoritative gate is
+        // the server-side check in leaderRegisterParticipant, which uses the
+        // Admin SDK and bypasses these rules). For `list`, the client query
+        // MUST filter on subGroupId so Firestore can prove every result
+        // satisfies this condition; an unscoped query is rejected outright.
+        allow get, list: if isActiveLeader()
+            && leaderDoc().data.campId == campId
+            && resource.data.subGroupId == leaderDoc().data.subGroupId;
       }
 
       match /allocations/{allocationId} {

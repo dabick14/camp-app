@@ -25,6 +25,13 @@ export interface Participant {
   paymentClaimed?: boolean
   claimedBy?: string
   claimedAt?: Timestamp
+  // Confirmation layer (5b-ii): admin reconciled the sub-group's lump against
+  // claimed participants and confirmed this one — sets amountPaid = feeOwed.
+  // Presence of confirmedBatchId locks this participant to that batch;
+  // un-confirming is out of scope for v1 (see PAYMENTS_SPEC.md).
+  confirmedAt?: Timestamp
+  confirmedBy?: string
+  confirmedBatchId?: string
   roomedWithoutFullPayment?: boolean
   roomedWithoutFullPaymentNote?: string
   checkedInBy?: string

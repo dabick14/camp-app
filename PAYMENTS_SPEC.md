@@ -3,12 +3,12 @@
 ## Two-layer reality
 Participants pay sub-group leaders (informal, opaque). Leaders pay central admin in **lump sums** via MoMo. System models layer 2.
 
-## ⚠️ Design revision (5b-i) — claim layer replaces CSV-allocation as the primary signal
+## Design — two-layer claim + confirm flow (built across 5b-i and 5b-ii)
 
-The CSV-allocation model below (steps 2–4: generate roster → leader fills amountPaid → admin uploads) describes how `amountPaid` gets confirmed. That flow **still applies** for admin reconciliation (5b-ii, not yet built), but **leaders no longer fill in per-person amounts on a CSV**. Instead:
+The original CSV-allocation model (steps 2–4: generate roster → leader fills amountPaid → admin uploads) has been superseded by an in-system two-step flow. The old CSV upload feature remains in the UI as a legacy escape hatch but is no longer the primary path.
 
-### Claim layer (built in 5b-i)
-Leaders mark who paid via an in-system roster screen. Per participant, it is binary: **Paid / Not paid** — no amounts, because the leader handles lump sums, not per-person accounting. The system captures this as:
+### Claim layer (5b-i)
+Leaders mark who paid via an in-system roster screen. Per participant, it is binary: **Paid / Not paid** — no amounts, because the leader handles lump sums, not per-person accounting.
 
 ```ts
 paymentClaimed: boolean     // leader's assertion
@@ -16,20 +16,36 @@ claimedBy: string           // leader uid
 claimedAt: Timestamp
 ```
 
-**Critical constraint:** `paymentClaimed` is a signal, NOT a confirmation. It does not change `amountPaid`, `paymentState`, or rooming eligibility. The leader's roster gives admin a pre-sorted list to reconcile against the lump-sum batch. Admin confirmation (5b-ii) is the step that reads these claims and updates `amountPaid`.
+**Critical constraint:** `paymentClaimed` is a signal, NOT a confirmation. It does not change `amountPaid`, `paymentState`, or rooming eligibility. Leaders cannot write `amountPaid` or any rooming field — blocked by Firestore rules and enforced server-side in `setPaymentClaim`.
 
-**Write path:** `setPaymentClaim` Cloud Function (callable). Leader auth, sub-group scoped server-side. Leaders cannot write `amountPaid` or any rooming field — blocked by Firestore rules.
+### Confirmation layer (5b-ii)
+Admin opens the batch detail, sees the list of claimed-but-unconfirmed participants for that sub-group, and compares:
 
-### Revised two-step flow
-1. **Leader claims** (5b-i — this phase): leader opens roster, taps "Mark paid" per person who handed them money. Running total shows what lump sum to expect.
-2. **Admin confirms** (5b-ii — future): admin opens batch, sees claimed participants, confirms or adjusts amounts → updates `amountPaid` → unlocks rooming.
+- **Expected** = Σ `feeOwed` of claimed-unconfirmed participants
+- **Received** = `batch.amountReceived`
 
-The batch and allocation data model below is unchanged — it's still the confirmation layer. Steps 2–4 in "Batch lifecycle" will be replaced by the confirmation UI in 5b-ii.
+**Clean match (expected === received):**
+"Reconcile & Confirm" button is enabled. One Firestore transaction:
+- For each claimed-unconfirmed participant: sets `amountPaid = feeOwed`, `confirmedAt`, `confirmedBy`, `confirmedBatchId` → `derivePaymentState` returns PAID → rooming unlocks.
+- Sets batch `status = 'RECONCILED'`, `amountAllocated = amountReceived`.
+- All-or-nothing: any failure (participant not found, cross-sub-group mismatch, already confirmed, wrong amount) aborts the entire transaction.
+
+**Mismatch (expected ≠ received):**
+"Reconcile & Confirm" is disabled. "Reconcile with Variance" is always available as an escape hatch:
+- Sets batch `status = 'RECONCILED'`, `varianceAcknowledged: true`, `varianceNote` (required).
+- Does **NOT** confirm any participant — they stay claimed-but-unconfirmed and remain unroomable.
+- Admin uses the per-person payment override (Day 4c) if they must room someone before the variance is resolved.
+
+**Un-confirming confirmed participants is out of scope for v1 (Phase 2).** Confirmed participants stay confirmed even if the batch is reopened.
+
+### Full two-step flow
+1. **Leader claims**: opens roster, taps "Mark paid" per person who handed them money. Running total shows the lump sum to expect.
+2. **Admin confirms**: opens batch, sees claimed participants list + Σ feeOwed vs received comparison. On clean match → "Reconcile & Confirm" → all become PAID + roomable atomically. On mismatch → "Reconcile with Variance" → batch closes without confirming anyone.
 
 ## Core entities
 - **PaymentBatch** — lump sum received from a sub-group. Has reference code and OPEN/RECONCILED status.
-- **Allocation** — record that money from a batch covers a specific participant's fee. Immutable (voided allocations leave an audit row).
-- **Participant.amountPaid** — sum of valid allocations. Cached on participant doc, kept in sync transactionally.
+- **Allocation** — legacy: record that money from a batch covers a specific participant's fee (CSV-upload flow). Immutable (voided allocations leave an audit row). No longer the primary confirmation path.
+- **Participant.amountPaid** — set to `feeOwed` by `reconcileAndConfirm`; historically incremented by allocations. Kept in sync transactionally.
 
 ## Derived payment state
 - `feeOwed === 0` → WAIVED
@@ -64,7 +80,10 @@ A sub-group cannot accept new public registrations if it has any payment batch w
 - Selecting a different sub-group re-runs the check
 
 ### Cloud Function enforcement
-The `registerParticipant` Cloud Function MUST repeat this check server-side and reject the write if violated. The client-side check is UX, not security.
+`leaderRegisterParticipant` repeats this check server-side (Admin SDK, bypasses rules) and rejects with `failed-precondition` if violated. The client-side checks below are UX only.
+
+### Leader page UX pre-check (5b-ii)
+`LeaderRegisterPage` also calls `isSubGroupGated(campId, subGroupId)` at page-load — a client-side Firestore query using the new leader `allow list` rule on `paymentBatches`. If gated, the page shows a "Registration paused for your group — pending reconciliation" state INSTEAD of the form. This prevents the leader from filling the form only to hit a server rejection, while keeping the server-side gate as the authoritative integrity check.
 
 ### Admin override
 The admin-side "Add Participant" form (used for late arrivals, walk-ins, special cases) bypasses this check entirely. Done via a separate Cloud Function `adminAddParticipant` that:
@@ -75,7 +94,7 @@ The admin-side "Add Participant" form (used for late arrivals, walk-ins, special
 
 This gives admins a clean escape hatch for the rare necessary case while keeping the rule hard for self-registration.
 
-## Batch lifecycle (unchanged)
+## Batch lifecycle
 
 ### 1. Admin records the batch
 Page: `/admin/camps/:id/payments` → "New Batch"
@@ -90,44 +109,28 @@ Fields:
 
 Auto-generates reference code: first 8 alphanumeric chars of sub-group name uppercased + "-" + sequence number (per camp). E.g. "GALATIAN-007".
 
-### 2. Admin generates roster CSV
-On batch detail, "Download Roster" → CSV scoped to that sub-group:
-```
-participantId,fullName,phone,roomTypePreference,feeOwed,amountPaid
-{uuid},John Doe,0244111222,Standard,400,
-```
-Only includes participants where `registrationState === 'REGISTERED'`. `amountPaid` column blank.
+### 2. Leader claims participants (in-system)
+Leader logs in to their roster screen, taps "Mark paid" for each person who handed them money. The running total gives the leader the expected lump-sum figure to quote when they pay the admin.
 
-Admin sends to leader outside the system.
+### 3. Admin reconciles on batch detail
 
-### 3. Leader fills + returns
-Leader fills `amountPaid` per row, leaves blank for not-covered people, returns CSV.
+The batch detail page shows:
+- **Claimed** column: list of claimed-but-unconfirmed participants for the sub-group, with each `feeOwed` and a Σ total.
+- **Received**: `batch.amountReceived`.
+- **Difference**: Match / Short / Over, with delta amount.
 
-### 4. Admin uploads allocations
-"Upload Allocations" on batch detail. System parses:
-- Reads `participantId` and `amountPaid` columns only
-- Skips blank `amountPaid` rows
-- Validates each row:
-  - `participantId` exists in this camp
-  - Participant belongs to this batch's sub-group (hard reject if not)
-  - `amountPaid` is positive number
-- Preview screen: valid / warnings / errors
-- Sum check: if (this upload + already allocated) > amountReceived → ABORT with overspend error
+**Clean match (Σ feeOwed === amountReceived):**
+"Reconcile & Confirm" button enabled → one atomic transaction confirms all participants as PAID and marks the batch RECONCILED. Registration block on the sub-group is removed.
 
-On confirm:
-- ONE Firestore transaction creates all allocation docs
-- Increments each participant's `amountPaid`
-- Increments batch's `amountAllocated`
-- Batch stays OPEN
+**Mismatch:**
+"Reconcile & Confirm" is disabled. "Reconcile with Variance" always available → marks batch RECONCILED with `varianceAcknowledged: true` + required note, without confirming any participants. Resolution is manual / out-of-band for v1.
 
-### 5. Admin reconciles
-When done with the batch:
-- If allocated == received: "Mark Reconciled"
-- If different: "Reconcile with Variance" + note. Sets `varianceAcknowledged: true`.
+Reconciled batches can be reopened (audit-logged: `reopenedAt`, `reopenedBy`). Reopening resets `varianceAcknowledged: false` in the same write (invariant — never stale-true on an OPEN batch). Confirmed participants are NOT un-confirmed on reopen (Phase 2).
 
-Reconciled batches can be reopened (audit-logged).
+**Note on reconciliation impact:** a batch leaving OPEN (via confirm or variance reconcile) removes the sub-group's registration gate. This is the key feedback loop — the gate gives leaders an incentive to get the lump paid and the admin an incentive to reconcile promptly.
 
-**Note on reconciliation impact:** marking a batch RECONCILED removes the registration block on its sub-group. This is the key feedback loop — leaders are incentivized to resolve their batches because their sub-group's registration is stuck until they do.
+### Legacy: CSV allocation upload (still present, no longer primary)
+"Download Roster" and "Upload Allocations" buttons remain on the batch detail page for backwards compatibility and edge cases. The upload flow creates `Allocation` docs and increments `amountPaid` directly (no claim step). This path can coexist with the claim+confirm path on the same batch.
 
 ## Voiding allocations
 From participant detail, "Void" on any allocation row:
@@ -175,9 +178,9 @@ Below: batch list with filters. Each row:
 
 Batch detail page:
 - Header: code, sub-group, amount, status, dates
-- Actions: Download Roster, Upload Allocations, Mark Reconciled / Reopen
-- Allocations list with void buttons
-- Prominent display of `amountReceived - amountAllocated` remaining if OPEN
+- Actions: Download Roster, Upload Allocations (legacy), **Reconcile & Confirm** (enabled only on clean match) / **Reconcile with Variance** (always when OPEN) / Reopen (when RECONCILED)
+- Reconciliation panel: claimed-but-unconfirmed participants list, Σ feeOwed, vs received, Match/Short/Over
+- Legacy allocations list with void buttons
 
 ## Out of v1 scope
 - Payment aggregator integration

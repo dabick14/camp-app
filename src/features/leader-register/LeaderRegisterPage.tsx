@@ -13,6 +13,7 @@ import { formatMoney } from '@/lib/formatMoney'
 import { functions } from '@/lib/firebase'
 import { getCamp } from '@/features/camps/services/campService'
 import { listRoomTypes } from '@/features/rooms/services/roomTypeService'
+import { isSubGroupGated } from '@/features/payments/services/batchService'
 import type { Camp } from '@/features/camps/types'
 import type { RoomType } from '@/features/rooms/types'
 import { useUserRole } from '@/features/auth/UserRoleContext'
@@ -100,7 +101,7 @@ function Field({
   )
 }
 
-type PageStatus = 'loading' | 'open' | 'closed' | 'error'
+type PageStatus = 'loading' | 'open' | 'closed' | 'gated' | 'error'
 
 export function LeaderRegisterPage() {
   const role = useUserRole()
@@ -124,15 +125,18 @@ export function LeaderRegisterPage() {
 
   const campId = role.type === 'leader' ? role.campId : null
 
+  const subGroupId = role.type === 'leader' ? role.subGroupId : null
+
   useEffect(() => {
-    if (!campId) return
+    if (!campId || !subGroupId) return
     let cancelled = false
 
-    Promise.all([getCamp(campId), listRoomTypes(campId)])
-      .then(([campData, types]) => {
+    Promise.all([getCamp(campId), listRoomTypes(campId), isSubGroupGated(campId, subGroupId)])
+      .then(([campData, types, gated]) => {
         if (cancelled) return
         if (!campData) { setPageStatus('error'); return }
         if (!campData.registrationOpen) { setPageStatus('closed'); return }
+        if (gated) { setPageStatus('gated'); return }
         setCamp(campData)
         setRoomTypes(types)
         setPageStatus('open')
@@ -142,7 +146,7 @@ export function LeaderRegisterPage() {
       })
 
     return () => { cancelled = true }
-  }, [campId])
+  }, [campId, subGroupId])
 
   const {
     register,
@@ -283,6 +287,22 @@ export function LeaderRegisterPage() {
         <p className="text-lg font-medium">Registration is closed</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Registration for this camp is not currently open. Contact the camp administrator.
+        </p>
+        <div className="mt-6">
+          <LogoutButton />
+        </div>
+      </div>
+    )
+  }
+
+  if (pageStatus === 'gated') {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <p className="text-lg font-medium">Registration paused for your group</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your council has a payment batch that hasn't been fully reconciled.
+          No new registrations can be accepted until the admin reconciles it.
+          Contact your camp administrator to resolve this.
         </p>
         <div className="mt-6">
           <LogoutButton />

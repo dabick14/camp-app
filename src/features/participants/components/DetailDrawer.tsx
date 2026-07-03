@@ -449,9 +449,9 @@ export function DetailDrawer({
                   {(p.tags ?? []).length === 0 ? (
                     <span className="text-sm text-muted-foreground">No tags</span>
                   ) : (
-                    (p.tags ?? []).map((tag) => (
+                    (p.tags ?? []).map((tag, i) => (
                       <span
-                        key={tag}
+                        key={`${tag}-${i}`}
                         className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
                       >
                         {tag}

@@ -162,8 +162,8 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   // ── Claim layer (5b-i) ────────────────────────────────────────────────────
   // A leader marks paymentClaimed: true to assert "this person has paid me."
   // This is a pre-confirmation signal ONLY. It does NOT affect amountPaid,
-  // paymentState, or rooming eligibility. Admin confirmation (5b-ii, not yet
-  // built) is the step that reads these claims and actually updates amountPaid.
+  // paymentState, or rooming eligibility. Admin confirmation (5b-ii) is the
+  // step that reads these claims and actually updates amountPaid.
   //
   // Design constraint: claim is binary (no amount) because the leader knows
   // who paid, not how much — the batch lump-sum amount is reconciled centrally.
@@ -173,6 +173,16 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   paymentClaimed?: boolean;        // default absent / false
   claimedBy?: string;              // leader uid who set the claim
   claimedAt?: Timestamp;           // set on claim, cleared (field deleted) on unclaim
+
+  // ── Confirmation layer (5b-ii) ────────────────────────────────────────────
+  // Set atomically by reconcileAndConfirm when admin reconciles a CLEAN match:
+  //   Σ feeOwed of claimed-unconfirmed participants === batch.amountReceived.
+  // Sets amountPaid = feeOwed → derivePaymentState returns PAID → rooming unlocks.
+  // Presence of confirmedBatchId means this participant is locked to that batch.
+  // Un-confirming confirmed participants is out of scope for v1 (Phase 2).
+  confirmedAt?: Timestamp;
+  confirmedBy?: string;            // admin email or uid
+  confirmedBatchId?: string;       // batch that triggered the confirmation
 
   // Audit-only override flag
   // Set when admin assigns a room to a non-PAID/WAIVED participant.
@@ -211,14 +221,20 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   subGroupId: string;
   subGroupName: string;
   amountReceived: number;
-  amountAllocated: number;
+  amountAllocated: number;         // set to amountReceived on clean confirm; 0 on variance path
   method: 'MOMO' | 'CASH' | 'BANK' | 'OTHER';
   externalReference?: string;
   receivedAt: Timestamp;
   receivedBy: string;
   notes?: string;
   status: 'OPEN' | 'RECONCILED';
+  // INVARIANT: varianceAcknowledged resets to false in the SAME write whenever
+  // a batch transitions from RECONCILED back to OPEN (reopen or void-triggered flip).
+  // It must never be stale-true on an OPEN batch.
   varianceAcknowledged: boolean;
+  varianceNote?: string;           // required when varianceAcknowledged: true
+  reopenedAt?: Timestamp;          // set when batch is explicitly reopened
+  reopenedBy?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -272,13 +288,18 @@ If a later payment moves them to PAID, the flag stays `true` (for audit). To cle
 
 ## Security rules
 
-### `paymentBatches` — admin-only, no public read
+### `paymentBatches` — admin full access; leaders may list their own sub-group's batches
 ```
 match /camps/{campId}/paymentBatches/{batchId} {
   allow read, write: if isAdmin();
+  // Leaders may list/get batches for their own sub-group only (UX gate pre-check).
+  // The authoritative gate is leaderRegisterParticipant (Admin SDK, bypasses rules).
+  allow get, list: if isActiveLeader()
+      && leaderDoc().data.campId == campId
+      && resource.data.subGroupId == leaderDoc().data.subGroupId;
 }
 ```
-An earlier version of this doc specced a public `allow get: if true` rule here, justified by the public form needing to check for unreconciled batches client-side. That rule was never actually implemented in `firestore.rules`, and there was no `paymentBatches` rule at all until the post-Day-C cleanup added the admin-only one above — Payments still has no UI (placeholder route), so until now there was no rule and no documents either. Now that the public form is removed and the reconciliation gate lives entirely server-side in `leaderRegisterParticipant` (Admin SDK, bypasses rules), there's no reason for any non-admin read access. Verified by `functions/src/paymentBatches.rules.test.ts` (admin read succeeds, unauthenticated and non-admin reads are denied) — this is the one rules-behavior test in the suite; everything else tests Cloud Function logic via the Admin SDK, which always bypasses rules and can't verify them.
+Leaders need read access so the leader registration page can check `isSubGroupGated()` before rendering the form — a UX pre-check that mirrors the server-side gate. The client query MUST filter on `subGroupId` for `list` to be proven correct by Firestore. Writes remain admin-only; leader reads do not expose other sub-groups' batches.
 
 ### Leader-scoped participant reads (leader-auth pivot)
 ```

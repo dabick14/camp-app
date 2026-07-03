@@ -14,7 +14,7 @@ import { db } from '@/lib/firebase'
 import { formatMoney } from '@/lib/formatMoney'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import type { Participant } from '@/features/participants/types'
-import { markReconciled, reconcileWithVariance, reopenBatch } from './services/batchService'
+import { reconcileAndConfirm, reconcileWithVariance, reopenBatch } from './services/batchService'
 import { listAllocationsByBatch, voidAllocation } from './services/allocationService'
 import type { Allocation, PaymentBatch } from './types'
 import { BatchStatusBadge } from './components/BatchStatusBadge'
@@ -42,7 +42,7 @@ function uid() {
   return user?.email ?? user?.uid ?? 'admin'
 }
 
-// ── Part C: roster CSV ────────────────────────────────────────────────────────
+// ── Roster CSV (legacy — leaders now use in-system claim; this remains for reference)
 function downloadRosterCsv(participants: Participant[], subGroupName: string, referenceCode: string) {
   const rows: string[][] = [
     ['participantId', 'fullName', 'phone', 'roomTypePreference', 'feeOwed', 'amountPaid'],
@@ -130,6 +130,8 @@ function VarianceDialog({
   campId,
   batchId,
   remaining,
+  unconfirmedCount,
+  subGroupName,
   currency,
   onReconciled,
   onClose,
@@ -137,6 +139,8 @@ function VarianceDialog({
   campId: string
   batchId: string
   remaining: number
+  unconfirmedCount: number
+  subGroupName: string
   currency: string
   onReconciled: () => void
   onClose: () => void
@@ -159,6 +163,10 @@ function VarianceDialog({
     }
   }
 
+  const diffLabel = remaining > 0
+    ? `${formatMoney(remaining, currency)} short`
+    : `${formatMoney(-remaining, currency)} over`
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-sm">
@@ -167,9 +175,16 @@ function VarianceDialog({
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            There is an unallocated balance of{' '}
-            <span className="font-medium">{formatMoney(remaining, currency)}</span>.
-            Reconciling acknowledges this discrepancy. Provide a note.
+            The claimed participants owe a total that is{' '}
+            <span className="font-medium text-amber-700">{diffLabel}</span> of the received lump.
+            {unconfirmedCount > 0 && (
+              <>
+                {' '}The {unconfirmedCount} claimed participant{unconfirmedCount !== 1 ? 's' : ''} in{' '}
+                <span className="font-medium">{subGroupName}</span> will{' '}
+                <strong>not</strong> be confirmed as PAID and will remain unroomable.
+                Use the per-person override if you need to room someone before this is resolved.
+              </>
+            )}
           </p>
           <Textarea
             value={note}
@@ -220,8 +235,9 @@ export function BatchDetailPage() {
       const allocs = await listAllocationsByBatch(campId, batchId)
       allocs.sort((a, b) => a.createdAt?.toMillis?.() - b.createdAt?.toMillis?.() || 0)
       setAllocations(allocs)
-    } catch {
-      toast.error('Failed to load batch')
+    } catch (err) {
+      console.error('[BatchDetailPage] loadBatch failed:', err)
+      toast.error((err as Error).message ?? 'Failed to load batch')
     } finally {
       setLoading(false)
     }
@@ -232,20 +248,35 @@ export function BatchDetailPage() {
   if (loading) return <div className="px-6 py-6 text-sm text-muted-foreground">Loading…</div>
   if (!batch) return null
 
-  const remaining = batch.amountReceived - batch.amountAllocated
-  const hasVariance = remaining !== 0
   const sgParticipants = participants.filter((p) => p.subGroupId === batch.subGroupId)
   const activeAllocations = allocations.filter((a) => !a.voided)
 
-  async function handleMarkReconciled() {
+  // Claimed-but-unconfirmed: leader has asserted payment but admin hasn't confirmed yet
+  const claimedUnconfirmed = sgParticipants.filter(
+    (p) =>
+      p.registrationState === 'REGISTERED' &&
+      p.paymentClaimed === true &&
+      !p.confirmedBatchId,
+  )
+  const claimedSum = claimedUnconfirmed.reduce((s, p) => s + p.feeOwed, 0)
+  const matches = claimedUnconfirmed.length > 0 && claimedSum === batch.amountReceived
+  const diff = batch.amountReceived - claimedSum  // positive = we received more than claimed; negative = short
+
+  // Legacy remaining (from old CSV-allocation flow)
+  const remaining = batch.amountReceived - batch.amountAllocated
+
+  async function handleReconcileAndConfirm() {
     if (!campId || !batchId) return
     setWorking(true)
     try {
-      await markReconciled(campId, batchId, uid())
-      toast.success('Batch marked as reconciled')
+      await reconcileAndConfirm(campId, batchId, claimedUnconfirmed.map((p) => p.id), uid())
+      toast.success(`${claimedUnconfirmed.length} participant${claimedUnconfirmed.length !== 1 ? 's' : ''} confirmed as PAID`)
       await loadBatch()
-    } catch (err) { toast.error((err as Error).message ?? 'Failed') }
-    finally { setWorking(false) }
+    } catch (err) {
+      toast.error((err as Error).message ?? 'Failed')
+    } finally {
+      setWorking(false)
+    }
   }
 
   async function handleReopen() {
@@ -290,9 +321,9 @@ export function BatchDetailPage() {
             </p>
           )}
           {batch.notes && <p className="mt-0.5 text-sm text-muted-foreground">Note: {batch.notes}</p>}
-          {(batch as any).varianceNote && (
+          {batch.varianceNote && (
             <p className="mt-0.5 text-sm text-amber-700">
-              Variance note: {(batch as any).varianceNote}
+              Variance note: {batch.varianceNote}
             </p>
           )}
         </div>
@@ -317,15 +348,17 @@ export function BatchDetailPage() {
           </Button>
           {batch.status === 'OPEN' ? (
             <>
-              {!hasVariance ? (
-                <Button size="sm" onClick={handleMarkReconciled} disabled={working}>
-                  Mark reconciled
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => setShowVariance(true)} disabled={working}>
-                  Reconcile with variance
-                </Button>
-              )}
+              <Button
+                size="sm"
+                onClick={handleReconcileAndConfirm}
+                disabled={working || !matches}
+                title={!matches ? `Claimed participants owe ${formatMoney(claimedSum, currency)} — must equal ${formatMoney(batch.amountReceived, currency)} to confirm` : undefined}
+              >
+                Reconcile &amp; Confirm
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
+                Reconcile with variance
+              </Button>
             </>
           ) : (
             <Button variant="outline" size="sm" onClick={handleReopen} disabled={working}>
@@ -342,26 +375,73 @@ export function BatchDetailPage() {
           <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(batch.amountReceived, currency)}</p>
         </div>
         <div className="rounded-lg border bg-card px-5 py-4">
-          <p className="text-sm text-muted-foreground">Allocated</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(batch.amountAllocated, currency)}</p>
+          <p className="text-sm text-muted-foreground">Claimed</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(claimedSum, currency)}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {activeAllocations.length} active allocation{activeAllocations.length !== 1 ? 's' : ''}
+            {claimedUnconfirmed.length} unconfirmed participant{claimedUnconfirmed.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className={`rounded-lg border px-5 py-4 ${remaining > 0 && batch.status === 'OPEN' ? 'border-amber-300 bg-amber-50' : 'bg-card'}`}>
-          <p className="text-sm text-muted-foreground">Remaining</p>
-          <p className={`mt-1 text-2xl font-semibold tabular-nums ${remaining > 0 && batch.status === 'OPEN' ? 'text-amber-700' : ''}`}>
-            {formatMoney(remaining, currency)}
+        <div className={`rounded-lg border px-5 py-4 ${!matches && batch.status === 'OPEN' ? 'border-amber-300 bg-amber-50' : matches ? 'border-emerald-300 bg-emerald-50' : 'bg-card'}`}>
+          <p className="text-sm text-muted-foreground">Difference</p>
+          <p className={`mt-1 text-2xl font-semibold tabular-nums ${!matches && batch.status === 'OPEN' ? 'text-amber-700' : matches ? 'text-emerald-700' : ''}`}>
+            {matches ? '✓ Match' : diff > 0 ? `+${formatMoney(diff, currency)}` : formatMoney(diff, currency)}
           </p>
-          {remaining > 0 && batch.status === 'OPEN' && (
-            <p className="mt-0.5 text-xs text-amber-600">Blocks registration for {batch.subGroupName}</p>
+          {batch.status === 'OPEN' && (
+            <p className="mt-0.5 text-xs">
+              {matches
+                ? <span className="text-emerald-600">Ready to confirm</span>
+                : diff > 0
+                  ? <span className="text-amber-600">Over by {formatMoney(diff, currency)}</span>
+                  : <span className="text-amber-600">Short by {formatMoney(-diff, currency)} · blocks registration</span>
+              }
+            </p>
           )}
         </div>
       </div>
 
-      <Separator />
+      {/* Reconciliation panel — claimed-but-unconfirmed participants */}
+      {(claimedUnconfirmed.length > 0 || batch.status === 'OPEN') && (
+        <>
+          <Separator />
+          <section className="mt-8">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Claimed — awaiting confirmation
+            </h3>
+            {claimedUnconfirmed.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No participants have been claimed by the leader yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
+                      <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Fee owed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claimedUnconfirmed.map((p) => (
+                      <tr key={p.id} className="border-t">
+                        <td className="px-4 py-2.5">{p.fullName}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(p.feeOwed, currency)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t bg-muted/30 font-medium">
+                      <td className="px-4 py-2.5">Total</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(claimedSum, currency)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
-      {/* Allocations */}
+      <Separator className="mt-8" />
+
+      {/* Allocations (legacy CSV-upload flow) */}
       <section className="mt-8">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Allocations
@@ -417,6 +497,11 @@ export function BatchDetailPage() {
             </table>
           </div>
         )}
+        {remaining !== 0 && batch.status === 'OPEN' && activeAllocations.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Legacy allocation balance: {formatMoney(remaining, currency)} unallocated
+          </p>
+        )}
       </section>
 
       {/* Modals */}
@@ -445,7 +530,9 @@ export function BatchDetailPage() {
         <VarianceDialog
           campId={campId!}
           batchId={batchId!}
-          remaining={remaining}
+          remaining={diff}
+          unconfirmedCount={claimedUnconfirmed.length}
+          subGroupName={batch.subGroupName}
           currency={currency}
           onReconciled={loadBatch}
           onClose={() => setShowVariance(false)}
