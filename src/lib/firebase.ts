@@ -22,8 +22,13 @@ if (import.meta.env.DEV && import.meta.env.VITE_FUNCTIONS_EMULATOR === 'true') {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
 }
 
-// App Check enforcement is OFF until Day 6 — skip initialization in dev to
-// avoid reCAPTCHA errors on localhost (site key isn't authorized for that domain).
+// App Check: production builds send a reCAPTCHA v3 token with every request.
+// Dev builds skip initialization entirely — use the emulator locally.
+// Console enforcement must be enabled in Firebase console → App Check for
+// Firestore (client SDK) and Cloud Functions (callable layer).
+// onRequest admin functions (adminAddParticipant, provisionLeader,
+// setLeaderActive) use raw fetch and must rely on Auth verification alone;
+// they would need explicit token injection before enforceAppCheck can apply.
 if (!import.meta.env.DEV) {
   initializeAppCheck(app, {
     provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),

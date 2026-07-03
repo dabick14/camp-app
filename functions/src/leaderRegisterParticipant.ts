@@ -16,7 +16,7 @@ interface LeaderRegisterParticipantData {
 // protocol, and `request.auth` is verified server-side by the platform
 // before the handler ever runs (no manual Bearer-token parsing needed,
 // and no way to forge it the way a raw HTTP body can be tampered with).
-export const leaderRegisterParticipant = onCall<LeaderRegisterParticipantData>(async (request) => {
+export const leaderRegisterParticipant = onCall<LeaderRegisterParticipantData>({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.')
   }

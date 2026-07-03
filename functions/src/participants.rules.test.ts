@@ -190,9 +190,16 @@ describe('participants rules — leader CAN update claim fields on their own sub
   })
 })
 
-// ── Unauthenticated / non-leader write ────────────────────────────────────────
+// ── Unauthenticated access ────────────────────────────────────────────────────
 
-describe('participants rules — unauthenticated write denied', () => {
+describe('participants rules — unauthenticated access denied', () => {
+  it('denies an unauthenticated read of a participant doc', async () => {
+    const ctx = testEnv.unauthenticatedContext()
+    await assertFails(
+      ctx.firestore().doc(`camps/${campId}/participants/${participantId}`).get(),
+    )
+  })
+
   it('denies an unauthenticated write to a participant', async () => {
     const ctx = testEnv.unauthenticatedContext()
     await assertFails(

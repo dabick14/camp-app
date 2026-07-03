@@ -18,7 +18,7 @@ interface SetPaymentClaimData {
  * A crafted request with a foreign participantId is rejected if that participant
  * belongs to a different sub-group.
  */
-export const setPaymentClaim = onCall<SetPaymentClaimData>(async (request) => {
+export const setPaymentClaim = onCall<SetPaymentClaimData>({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.')
   }
