@@ -19,13 +19,44 @@ Secrets are stored in the **`production` environment** (Settings → Environment
 
 | Secret | Value |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | Raw JSON content of a Firebase service account key with `Firebase Hosting Admin` + `Cloud Functions Developer` roles. **Paste the entire JSON, not base64.** |
+| `FIREBASE_SERVICE_ACCOUNT` | Raw JSON content of a Firebase service account key. **Paste the entire JSON, not base64.** |
 | `FIREBASE_PROJECT_ID` | Your Firebase project ID (e.g. `camp-app-abc12`) |
 
 To generate the key:
 1. Firebase Console → Project Settings → Service accounts
 2. **Generate new private key** → download the JSON
 3. Open the file, copy the entire contents, paste as the secret value
+
+**That key belongs to the default Firebase Admin SDK service account
+(`firebase-adminsdk-...@<project>.iam.gserviceaccount.com`), which has no
+deploy permissions by default** — it's meant for the Admin SDK talking to
+Firestore/Auth at runtime, not for `firebase deploy`. Firebase's own IAM docs
+say the standard Firebase predefined roles (including `Firebase Admin`) are
+*not* sufficient for deploying functions — grant these explicitly in
+Cloud Console → IAM, or via gcloud:
+
+```bash
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<SA_EMAIL>" --role="roles/cloudfunctions.admin"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<SA_EMAIL>" --role="roles/iam.serviceAccountUser"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<SA_EMAIL>" --role="roles/serviceusage.serviceUsageConsumer"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<SA_EMAIL>" --role="roles/firebasehosting.admin"
+```
+
+- `serviceusage.serviceUsageConsumer` — without it, deploy fails checking
+  whether required APIs (`cloudfunctions`, `cloudbuild`, `artifactregistry`)
+  are enabled, even though they already are.
+- `cloudfunctions.admin` + `iam.serviceAccountUser` — without these, deploy
+  fails with `Permission 'cloudfunctions.functions.list' denied` (or
+  `.create`/`.update`), because `Cloud Functions Developer` alone isn't
+  enough for a CI identity to manage functions end-to-end.
+- These functions are Gen 2 (Cloud Run-backed under the hood). If a future
+  deploy fails on an Artifact Registry permission instead, that's the next
+  layer down — grant `roles/artifactregistry.writer` on the `gcf-artifacts`
+  repo when/if that actually happens, rather than pre-granting it now.
 
 ### Vite build-time env vars (used by `deploy-hosting` only)
 

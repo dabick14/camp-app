@@ -108,7 +108,7 @@ jobs:
         run: |
           firebase deploy --only functions \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --force --debug
+            --force
 
       - name: Clean up credentials
         if: always()
