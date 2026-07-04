@@ -34,3 +34,7 @@ service-account-key.json
 *-serviceaccount*.json
 firebase-adminsdk-*.json
 scripts/probe-scale.ts
+
+# Firebase emulator exported state — local only; devs get a clean slate on
+# first clone and run dev:seed to populate.
+emulator-data/
