@@ -312,3 +312,124 @@ describe('setPaymentClaim — auth guards', () => {
     ).rejects.toMatchObject({ code: 'invalid-argument' })
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Confirmation lock — PART A money-path integrity
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Once reconcileAndConfirm sets confirmedBatchId on a participant, the leader
+// cannot change paymentClaimed in either direction. These tests call the
+// function directly (bypassing UI) — the guard is at the function level, not
+// the UI layer.
+
+describe('setPaymentClaim — confirmation lock', () => {
+  async function seedConfirmedParticipant(
+    campId: string,
+    participantId: string,
+    subGroupId: string,
+    feeOwed = 400,
+  ) {
+    // Mirrors what reconcileAndConfirm writes: amountPaid = feeOwed,
+    // confirmedBatchId present, paymentClaimed still true.
+    await db().doc(`camps/${campId}/participants/${participantId}`).set({
+      fullName: `Confirmed ${participantId}`,
+      phone: `05${Math.floor(Math.random() * 9e7 + 1e7)}`,
+      gender: 'M',
+      subGroupId,
+      subGroupName: 'Test Council',
+      feeOwed,
+      amountPaid: feeOwed,         // PAID
+      paymentClaimed: true,
+      claimedBy: 'leader-uid',
+      claimedAt: Timestamp.now(),
+      confirmedBatchId: 'batch-001',
+      confirmedAt: Timestamp.now(),
+      confirmedBy: 'admin@test.com',
+      registrationState: 'REGISTERED',
+      checkInState: 'NOT_ARRIVED',
+      tags: [],
+      source: 'leader',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    })
+  }
+
+  it('[control] leader CAN toggle an unconfirmed participant freely', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`, pId = `p-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedParticipant(campId, pId, sgId)  // no confirmedBatchId
+
+    // Can claim
+    await expect(
+      setPaymentClaim.run(makeRequest({ participantId: pId, claimed: true }, leaderUid)),
+    ).resolves.toMatchObject({ claimed: true })
+
+    // Can un-claim
+    await expect(
+      setPaymentClaim.run(makeRequest({ participantId: pId, claimed: false }, leaderUid)),
+    ).resolves.toMatchObject({ claimed: false })
+  })
+
+  it('rejects un-claim on a confirmed participant (has confirmedBatchId)', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`, pId = `p-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedConfirmedParticipant(campId, pId, sgId)
+
+    await expect(
+      setPaymentClaim.run(makeRequest({ participantId: pId, claimed: false }, leaderUid)),
+    ).rejects.toMatchObject({ code: 'failed-precondition' })
+
+    // confirmedBatchId and amountPaid must be untouched
+    const snap = await db().doc(`camps/${campId}/participants/${pId}`).get()
+    const data = snap.data()!
+    expect(data.confirmedBatchId).toBe('batch-001')
+    expect(data.amountPaid).toBe(400)
+    expect(data.paymentClaimed).toBe(true)  // unchanged
+  })
+
+  it('rejects re-claim attempt on a confirmed participant (lock is bidirectional)', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`, pId = `p-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedConfirmedParticipant(campId, pId, sgId)
+
+    await expect(
+      setPaymentClaim.run(makeRequest({ participantId: pId, claimed: true }, leaderUid)),
+    ).rejects.toMatchObject({ code: 'failed-precondition' })
+  })
+
+  it('rejection holds against a crafted direct call (not just disabled UI)', async () => {
+    // This test documents that the guard is in the function, not the UI.
+    // A leader who bypasses the roster UI and calls setPaymentClaim directly
+    // with a confirmed participant's id is still rejected.
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`, pId = `p-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedConfirmedParticipant(campId, pId, sgId)
+
+    // Crafted call: valid leader, own sub-group, confirmed participant
+    await expect(
+      setPaymentClaim.run(
+        makeRequest({ participantId: pId, claimed: false }, leaderUid),
+      ),
+    ).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: expect.stringContaining('confirmed'),
+    })
+
+    // Document state must be unchanged after the rejected attempt
+    const snap = await db().doc(`camps/${campId}/participants/${pId}`).get()
+    expect(snap.data()!.confirmedBatchId).toBe('batch-001')
+    expect(snap.data()!.amountPaid).toBe(400)
+  })
+})

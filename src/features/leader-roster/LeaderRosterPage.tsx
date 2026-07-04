@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Link } from 'react-router-dom'
-import { BookOpen, CheckSquare, ClipboardList, Square, UserPlus } from 'lucide-react'
+import { BookOpen, CheckSquare, ClipboardList, Lock, Square, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { db, functions } from '@/lib/firebase'
 import { formatMoney } from '@/lib/formatMoney'
@@ -24,7 +24,7 @@ const setPaymentClaimFn = httpsCallable<
 
 type RosterParticipant = Pick<
   Participant,
-  'id' | 'fullName' | 'feeOwed' | 'registrationState' | 'paymentClaimed' | 'claimedBy'
+  'id' | 'fullName' | 'feeOwed' | 'registrationState' | 'paymentClaimed' | 'claimedBy' | 'confirmedBatchId'
 >
 
 export function LeaderRosterPage() {
@@ -64,6 +64,7 @@ export function LeaderRosterPage() {
               registrationState: data.registrationState,
               paymentClaimed: data.paymentClaimed,
               claimedBy: data.claimedBy,
+              confirmedBatchId: data.confirmedBatchId,
             }
           })
           .filter((p) => p.registrationState === 'REGISTERED')
@@ -180,8 +181,33 @@ export function LeaderRosterPage() {
       {!loading && participants.length > 0 && (
         <div className="divide-y rounded-md border">
           {participants.map((p) => {
+            const isConfirmed = !!p.confirmedBatchId
             const isClaimed = !!p.paymentClaimed
             const isBusy = toggling.has(p.id)
+
+            if (isConfirmed) {
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toast.info("Confirmed payments can't be changed — contact the admin.")}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left bg-emerald-50/60"
+                >
+                  <Lock className="h-5 w-5 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium leading-snug">{p.fullName}</span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+                      <Lock className="h-3 w-3" />
+                      Confirmed
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+                    {formatMoney(p.feeOwed, currency)}
+                  </span>
+                </button>
+              )
+            }
+
             return (
               <button
                 key={p.id}
