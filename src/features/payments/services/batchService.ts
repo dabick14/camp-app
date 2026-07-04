@@ -226,6 +226,7 @@ export async function reopenBatch(
   campId: string,
   batchId: string,
   uid: string,
+  reopenReason?: string,
 ): Promise<void> {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(batchRef(campId, batchId))
@@ -238,6 +239,7 @@ export async function reopenBatch(
       varianceAcknowledged: false,
       reopenedAt: serverTimestamp(),
       reopenedBy: uid,
+      ...(reopenReason ? { reopenReason } : {}),
       updatedAt: serverTimestamp(),
       updatedBy: uid,
     })

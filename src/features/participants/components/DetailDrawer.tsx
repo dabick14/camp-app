@@ -154,6 +154,7 @@ export function DetailDrawer({
   const [busy, setBusy] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmUnassign, setConfirmUnassign] = useState(false)
+  const [confirmUndoCheckIn, setConfirmUndoCheckIn] = useState(false)
   const [confirmClearFlag, setConfirmClearFlag] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [editingNotes, setEditingNotes] = useState(false)
@@ -172,6 +173,7 @@ export function DetailDrawer({
   useEffect(() => {
     setConfirmCancel(false)
     setConfirmUnassign(false)
+    setConfirmUndoCheckIn(false)
     setConfirmClearFlag(false)
     setEditingNotes(false)
     setTagInput('')
@@ -664,15 +666,28 @@ export function DetailDrawer({
 
                         {/* Undo check-in (if checked in) */}
                         {p.checkInState === 'ARRIVED' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleUndoCheckIn}
-                            disabled={busy}
-                          >
-                            Undo check-in
-                          </Button>
+                          confirmUndoCheckIn ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Undo check-in?</span>
+                              <Button size="sm" variant="destructive" onClick={handleUndoCheckIn} disabled={busy}>
+                                Undo
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmUndoCheckIn(false)}>
+                                Keep
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmUndoCheckIn(true)}
+                              disabled={busy}
+                              className="text-muted-foreground"
+                            >
+                              Undo check-in
+                            </Button>
+                          )
                         )}
                       </div>
                     </>
@@ -706,15 +721,28 @@ export function DetailDrawer({
                         </Button>
 
                         {p.checkInState === 'ARRIVED' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleUndoCheckIn}
-                            disabled={busy}
-                          >
-                            Undo check-in
-                          </Button>
+                          confirmUndoCheckIn ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Undo check-in?</span>
+                              <Button size="sm" variant="destructive" onClick={handleUndoCheckIn} disabled={busy}>
+                                Undo
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmUndoCheckIn(false)}>
+                                Keep
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmUndoCheckIn(true)}
+                              disabled={busy}
+                              className="text-muted-foreground"
+                            >
+                              Undo check-in
+                            </Button>
+                          )
                         )}
                       </div>
                     </>
