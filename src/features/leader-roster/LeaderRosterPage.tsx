@@ -130,18 +130,18 @@ export function LeaderRosterPage() {
       <div className="mb-6 flex gap-2 border-b pb-4">
         <Link
           to="/leader/register"
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
         >
           <UserPlus className="h-4 w-4" />
           Register
         </Link>
-        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-sm font-medium">
+        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-3.5 text-sm font-medium">
           <ClipboardList className="h-4 w-4" />
           Payment roster
         </span>
         <Link
           to="/guide"
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
         >
           <BookOpen className="h-4 w-4" />
           Guide
@@ -196,8 +196,15 @@ export function LeaderRosterPage() {
                 ) : (
                   <Square className="h-5 w-5 shrink-0 text-muted-foreground" />
                 )}
-                <span className="flex-1 font-medium">{p.fullName}</span>
-                <span className="text-sm text-muted-foreground tabular-nums">
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium leading-snug">{p.fullName}</span>
+                  {isClaimed && (
+                    <span className="mt-0.5 inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+                      Claimed
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
                   {formatMoney(p.feeOwed, currency)}
                 </span>
               </button>

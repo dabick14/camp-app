@@ -331,20 +331,20 @@ export function LeaderRegisterPage() {
 
       {/* Nav between leader screens */}
       <div className="mb-6 flex gap-2 border-b pb-4">
-        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-sm font-medium">
+        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-3.5 text-sm font-medium">
           <UserPlus className="h-4 w-4" />
           Register
         </span>
         <Link
           to="/leader/roster"
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
         >
           <ClipboardList className="h-4 w-4" />
           Payment roster
         </Link>
         <Link
           to="/guide"
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
         >
           <BookOpen className="h-4 w-4" />
           Guide
@@ -361,7 +361,7 @@ export function LeaderRegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
 
         <Field label="Full name" required error={errors.fullName?.message}>
-          <Input {...register('fullName')} placeholder="John Doe" autoComplete="name" onFocus={scrollToFocused} />
+          <Input {...register('fullName')} placeholder="John Doe" autoComplete="name" onFocus={scrollToFocused} className="h-11" />
         </Field>
 
         <Field label="Phone number" required error={errors.phone?.message}>
@@ -371,6 +371,7 @@ export function LeaderRegisterPage() {
             inputMode="tel"
             autoComplete="tel"
             onFocus={scrollToFocused}
+            className="h-11"
           />
         </Field>
 
@@ -381,6 +382,7 @@ export function LeaderRegisterPage() {
             inputMode="email"
             autoComplete="email"
             onFocus={scrollToFocused}
+            className="h-11"
           />
         </Field>
 
@@ -393,7 +395,7 @@ export function LeaderRegisterPage() {
             {(['M', 'F'] as const).map((g) => (
               <label
                 key={g}
-                className={`flex flex-1 cursor-pointer items-center justify-center rounded-md border py-2.5 text-sm font-medium transition-colors ${
+                className={`flex flex-1 cursor-pointer items-center justify-center rounded-md border py-4 text-sm font-medium transition-colors ${
                   gender === g
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-input bg-background hover:bg-muted'
@@ -427,7 +429,7 @@ export function LeaderRegisterPage() {
             </button>
           </div>
           {useDob ? (
-            <Input type="date" {...register('dateOfBirth')} onFocus={scrollToFocused} />
+            <Input type="date" {...register('dateOfBirth')} onFocus={scrollToFocused} className="h-11" />
           ) : (
             <Input
               type="number"
@@ -437,6 +439,7 @@ export function LeaderRegisterPage() {
               placeholder="e.g. 22"
               {...register('age')}
               onFocus={scrollToFocused}
+              className="h-11"
             />
           )}
           {useDob && errors.dateOfBirth && (
@@ -456,7 +459,7 @@ export function LeaderRegisterPage() {
             {roomTypes.map((rt) => (
               <label
                 key={rt.id}
-                className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-4 text-sm transition-colors ${
                   selectedRoomTypeId === rt.id
                     ? 'border-primary bg-primary/5'
                     : 'border-input hover:bg-muted'
@@ -489,10 +492,10 @@ export function LeaderRegisterPage() {
         {softDup && (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <p className="mb-2">{softDup.message}</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button
                 type="button"
-                size="sm"
+                size="xl"
                 variant="outline"
                 onClick={acknowledgeAndResubmit}
                 className="border-amber-300 text-amber-800 hover:bg-amber-100"
@@ -502,7 +505,7 @@ export function LeaderRegisterPage() {
               </Button>
               <Button
                 type="button"
-                size="sm"
+                size="xl"
                 variant="ghost"
                 onClick={() => setSoftDup(null)}
                 className="text-amber-800 hover:bg-amber-100"
@@ -519,7 +522,7 @@ export function LeaderRegisterPage() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" size="xl" className="w-full" disabled={isSubmitting}>
           {isSubmitting ? 'Submitting…' : 'Register'}
         </Button>
       </form>
