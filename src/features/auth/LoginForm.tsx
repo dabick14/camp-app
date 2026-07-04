@@ -60,6 +60,12 @@ export function LoginForm({
                 Forgot password?
               </Link>
             </p>
+            <p className="text-center text-sm text-muted-foreground">
+              New here?{' '}
+              <Link to="/guide" className="hover:text-foreground hover:underline">
+                Read the leader guide
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

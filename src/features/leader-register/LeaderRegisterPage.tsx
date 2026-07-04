@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { httpsCallable } from 'firebase/functions'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
-import { ClipboardList, UserPlus } from 'lucide-react'
+import { BookOpen, ClipboardList, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -341,6 +341,13 @@ export function LeaderRegisterPage() {
         >
           <ClipboardList className="h-4 w-4" />
           Payment roster
+        </Link>
+        <Link
+          to="/guide"
+          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        >
+          <BookOpen className="h-4 w-4" />
+          Guide
         </Link>
       </div>
 

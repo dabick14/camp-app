@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Link } from 'react-router-dom'
-import { CheckSquare, Square, ClipboardList, UserPlus } from 'lucide-react'
+import { BookOpen, CheckSquare, ClipboardList, Square, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { db, functions } from '@/lib/firebase'
 import { formatMoney } from '@/lib/formatMoney'
@@ -139,6 +139,13 @@ export function LeaderRosterPage() {
           <ClipboardList className="h-4 w-4" />
           Payment roster
         </span>
+        <Link
+          to="/guide"
+          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        >
+          <BookOpen className="h-4 w-4" />
+          Guide
+        </Link>
       </div>
 
       {/* Summary */}

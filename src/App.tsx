@@ -19,6 +19,7 @@ import { LeaderRegisterPage } from '@/features/leader-register/LeaderRegisterPag
 import { LeaderRosterPage } from '@/features/leader-roster/LeaderRosterPage'
 import { PaymentsPage } from '@/features/payments/PaymentsPage'
 import { BatchDetailPage } from '@/features/payments/BatchDetailPage'
+import { LeaderGuidePage } from '@/features/guide/LeaderGuidePage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute requireRole="admin">{children}</ProtectedRoute>
@@ -37,6 +38,7 @@ export default function App() {
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/login/reset" element={<PasswordResetPage />} />
+            <Route path="/guide" element={<LeaderGuidePage />} />
 
             {/* Leader — registration + payment roster; the public self-select
                 flow (/r/:campId) was retired and removed in the post-Day-C cleanup */}
