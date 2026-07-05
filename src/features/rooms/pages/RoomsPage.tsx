@@ -4,6 +4,9 @@ import { PlusIcon, Trash2, UploadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -53,6 +56,8 @@ export function RoomsPage() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [editRoom, setEditRoom] = useState<Room | null>(null)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Room | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!campId) return
@@ -76,11 +81,16 @@ export function RoomsPage() {
     setRooms(data)
   }
 
-  async function handleDelete(room: Room) {
-    if (room.currentOccupancy > 0) return
-    if (!confirm(`Delete room ${room.number}?`)) return
-    await deleteRoom(campId!, room.id)
-    setRooms((prev) => prev.filter((r) => r.id !== room.id))
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteRoom(campId!, deleteTarget.id)
+      setRooms((prev) => prev.filter((r) => r.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const filtered = useMemo(() => {
@@ -247,7 +257,7 @@ export function RoomsPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(room)}
+                          onClick={() => setDeleteTarget(room)}
                           aria-label="Delete room"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -282,6 +292,27 @@ export function RoomsPage() {
         existingRooms={rooms}
         onImported={refreshRooms}
       />
+
+      {deleteTarget && (
+        <Dialog open onOpenChange={(v) => !v && !deleting && setDeleteTarget(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete room {deleteTarget.number}?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              This room will be permanently removed. This cannot be undone.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete room'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

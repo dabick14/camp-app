@@ -108,11 +108,17 @@ service cloud.firestore {
         // The preferred write path is the setPaymentClaim Cloud Function
         // (Admin SDK, bypasses rules), but this rule adds defense-in-depth
         // so even a crafted direct write can't touch amountPaid or rooming.
+        //
+        // Confirmed participants (confirmedBatchId present) are fully locked —
+        // the leader write-whitelist is blocked entirely. The authoritative
+        // guard is the setPaymentClaim function (Part A); this rule covers
+        // any direct client write that bypasses the function.
         allow update: if isActiveLeader()
             && leaderDoc().data.campId == campId
             && resource.data.subGroupId == leaderDoc().data.subGroupId
             && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['paymentClaimed', 'claimedBy', 'claimedAt', 'updatedAt', 'updatedBy']);
+                .hasOnly(['paymentClaimed', 'claimedBy', 'claimedAt', 'updatedAt', 'updatedBy'])
+            && resource.data.get('confirmedBatchId', null) == null;
 
         // Participant creation is handled exclusively by Cloud Functions
         // (adminAddParticipant, leaderRegisterParticipant — both use the

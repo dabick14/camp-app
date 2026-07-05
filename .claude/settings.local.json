@@ -26,7 +26,11 @@
       "WebFetch(domain:github.com)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(find /Users/daviddagvanderpuije/dev/flstuff/camp-app -iname \"*designer-skill*\" -o -iname \"*design-skill*\" 2>/dev/null; find ~/.claude/skills -iname \"*design*\" 2>/dev/null; ls /Users/daviddagvanderpuije/dev/flstuff/camp-app/.claude/skills 2>/dev/null)",
+      "Read(//Users/daviddagvanderpuije/.claude/**)",
+      "Skill(run)",
+      "Skill(run:*)"
     ],
     "additionalDirectories": [
       "/Users/daviddagvanderpuije/dev/flstuff/camp-app",

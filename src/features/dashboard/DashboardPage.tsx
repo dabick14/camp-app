@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -9,10 +9,14 @@ import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
 
-function BigMetric({ label, value, sub }: { label: string; value: number; sub?: string }) {
+function BigMetric({ label, value, sub, warn }: { label: string; value: number; sub?: string; warn?: boolean }) {
+  const alert = warn && value > 0
   return (
-    <div className="rounded-lg border bg-card px-5 py-4 text-card-foreground">
-      <p className="text-3xl font-bold tabular-nums">{value.toLocaleString()}</p>
+    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-red-200 bg-red-50 text-red-900' : 'bg-card text-card-foreground'}`}>
+      <div className="flex items-center gap-1.5">
+        {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />}
+        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-red-700' : ''}`}>{value.toLocaleString()}</p>
+      </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
@@ -132,7 +136,7 @@ export function DashboardPage() {
         <BigMetric label="Partial" value={metrics.partial} />
         <BigMetric label="Pending" value={metrics.pending} />
         <BigMetric label="Roomed" value={metrics.roomed} />
-        <BigMetric label="Overrides" value={metrics.overrides} />
+        <BigMetric label="Overrides" value={metrics.overrides} warn />
       </div>
 
       <div className="space-y-10">

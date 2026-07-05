@@ -178,7 +178,7 @@ export function CsvImportModal({
             <div className="space-y-4">
               {/* Valid rows */}
               <div>
-                <h3 className="mb-2 text-sm font-medium text-green-700">
+                <h3 className="mb-2 text-sm font-medium text-emerald-700">
                   Valid rows ({result.valid.length})
                 </h3>
                 {result.valid.length > 0 ? (

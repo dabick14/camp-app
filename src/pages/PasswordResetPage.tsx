@@ -52,9 +52,10 @@ export function PasswordResetPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoFocus
+                  className="h-11"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" size="xl" className="w-full" disabled={loading}>
                 {loading ? 'Sending…' : 'Send reset link'}
               </Button>
               <p className="text-center text-sm">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -167,17 +167,20 @@ export function PaymentsPage() {
                     <TableCell className="text-center">
                       {row.unreconciled ? (
                         <button
-                          className="text-amber-600 hover:underline"
+                          className="inline-flex items-center gap-1 text-amber-600 hover:underline"
                           onClick={() =>
                             row.openBatch &&
                             navigate(`/admin/camps/${campId}/payments/${row.openBatch!.id}`)
                           }
-                          title="Has OPEN batch with unallocated balance"
                         >
-                          ⚠️ Unreconciled
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          Unreconciled
                         </button>
                       ) : (
-                        <span className="text-emerald-600">✅ Reconciled</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600">
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                          Reconciled
+                        </span>
                       )}
                     </TableCell>
                   </TableRow>

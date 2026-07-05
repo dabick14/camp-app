@@ -15,11 +15,9 @@ import { formatMoney } from '@/lib/formatMoney'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import type { Participant } from '@/features/participants/types'
 import { reconcileAndConfirm, reconcileWithVariance, reopenBatch } from './services/batchService'
-import { listAllocationsByBatch, voidAllocation } from './services/allocationService'
-import type { Allocation, PaymentBatch } from './types'
+import type { PaymentBatch } from './types'
 import { BatchStatusBadge } from './components/BatchStatusBadge'
 import { BatchForm } from './components/BatchForm'
-import { AllocationsUploadModal } from './components/AllocationsUploadModal'
 
 const METHOD_LABEL: Record<string, string> = {
   MOMO: 'MoMo',
@@ -30,11 +28,6 @@ const METHOD_LABEL: Record<string, string> = {
 
 function formatDate(ts: { toDate(): Date }) {
   return ts.toDate().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function formatTs(ts: { toDate(): Date } | undefined) {
-  if (!ts) return '—'
-  return ts.toDate().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function uid() {
@@ -61,33 +54,33 @@ function downloadRosterCsv(participants: Participant[], subGroupName: string, re
   URL.revokeObjectURL(url)
 }
 
-// ── Void confirmation dialog ──────────────────────────────────────────────────
-function VoidDialog({
-  allocation,
+// ── Reopen confirmation dialog ────────────────────────────────────────────────
+function ReopenDialog({
   campId,
-  currency,
-  onVoided,
+  batchId,
+  referenceCode,
+  onReopened,
   onClose,
 }: {
-  allocation: Allocation
   campId: string
-  currency: string
-  onVoided: () => void
+  batchId: string
+  referenceCode: string
+  onReopened: () => void
   onClose: () => void
 }) {
   const [reason, setReason] = useState('')
   const [working, setWorking] = useState(false)
 
-  async function handleVoid() {
+  async function handleReopen() {
     if (!reason.trim()) return
     setWorking(true)
     try {
-      await voidAllocation(campId, allocation.id, reason, uid())
-      toast.success(`Allocation of ${formatMoney(allocation.amount, currency)} voided`)
-      onVoided()
+      await reopenBatch(campId, batchId, uid(), reason.trim())
+      toast.success('Batch reopened')
+      onReopened()
       onClose()
     } catch (err) {
-      toast.error((err as Error).message ?? 'Failed to void allocation')
+      toast.error((err as Error).message ?? 'Failed')
     } finally {
       setWorking(false)
     }
@@ -97,27 +90,25 @@ function VoidDialog({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Void allocation</DialogTitle>
+          <DialogTitle>Reopen batch {referenceCode}?</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Void {formatMoney(allocation.amount, currency)} for{' '}
-            <span className="font-medium">{allocation.participantName}</span>?
-            This decrements their amountPaid and the batch total.
-            {' '}If the batch was reconciled it will reopen.
+            This batch has been reconciled. Reopening resets its status to OPEN and unblocks
+            new registrations for this sub-group. Confirmed participants remain confirmed.
           </p>
           <Textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason for voiding…"
+            placeholder="Reason for reopening…"
             rows={3}
             className="text-sm"
           />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={working}>Cancel</Button>
-          <Button variant="destructive" onClick={handleVoid} disabled={working || !reason.trim()}>
-            {working ? 'Voiding…' : 'Void allocation'}
+          <Button variant="destructive" onClick={handleReopen} disabled={working || !reason.trim()}>
+            {working ? 'Reopening…' : 'Reopen batch'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -213,13 +204,11 @@ export function BatchDetailPage() {
   const currency = camp?.currency ?? 'GHS'
 
   const [batch, setBatch] = useState<PaymentBatch | null>(null)
-  const [allocations, setAllocations] = useState<Allocation[]>([])
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
-  const [showUpload, setShowUpload] = useState(false)
+  const [showReopen, setShowReopen] = useState(false)
   const [showVariance, setShowVariance] = useState(false)
-  const [voidTarget, setVoidTarget] = useState<Allocation | null>(null)
 
   const loadBatch = useCallback(async () => {
     if (!campId || !batchId) return
@@ -232,9 +221,6 @@ export function BatchDetailPage() {
         return
       }
       setBatch({ id: snap.id, ...snap.data() } as PaymentBatch)
-      const allocs = await listAllocationsByBatch(campId, batchId)
-      allocs.sort((a, b) => a.createdAt?.toMillis?.() - b.createdAt?.toMillis?.() || 0)
-      setAllocations(allocs)
     } catch (err) {
       console.error('[BatchDetailPage] loadBatch failed:', err)
       toast.error((err as Error).message ?? 'Failed to load batch')
@@ -249,7 +235,6 @@ export function BatchDetailPage() {
   if (!batch) return null
 
   const sgParticipants = participants.filter((p) => p.subGroupId === batch.subGroupId)
-  const activeAllocations = allocations.filter((a) => !a.voided)
 
   // Claimed-but-unconfirmed: leader has asserted payment but admin hasn't confirmed yet
   const claimedUnconfirmed = sgParticipants.filter(
@@ -261,9 +246,6 @@ export function BatchDetailPage() {
   const claimedSum = claimedUnconfirmed.reduce((s, p) => s + p.feeOwed, 0)
   const matches = claimedUnconfirmed.length > 0 && claimedSum === batch.amountReceived
   const diff = batch.amountReceived - claimedSum  // positive = we received more than claimed; negative = short
-
-  // Legacy remaining (from old CSV-allocation flow)
-  const remaining = batch.amountReceived - batch.amountAllocated
 
   async function handleReconcileAndConfirm() {
     if (!campId || !batchId) return
@@ -277,17 +259,6 @@ export function BatchDetailPage() {
     } finally {
       setWorking(false)
     }
-  }
-
-  async function handleReopen() {
-    if (!campId || !batchId) return
-    setWorking(true)
-    try {
-      await reopenBatch(campId, batchId, uid())
-      toast.success('Batch reopened')
-      await loadBatch()
-    } catch (err) { toast.error((err as Error).message ?? 'Failed') }
-    finally { setWorking(false) }
   }
 
   return (
@@ -329,41 +300,46 @@ export function BatchDetailPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => downloadRosterCsv(sgParticipants, batch.subGroupName, batch.referenceCode)}
-          >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download roster
-          </Button>
-          {batch.status === 'OPEN' && (
-            <Button variant="outline" size="sm" onClick={() => setShowUpload(true)}>
-              Upload allocations
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadRosterCsv(sgParticipants, batch.subGroupName, batch.referenceCode)}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Download roster
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
-            Edit
-          </Button>
-          {batch.status === 'OPEN' ? (
-            <>
-              <Button
-                size="sm"
-                onClick={handleReconcileAndConfirm}
-                disabled={working || !matches}
-                title={!matches ? `Claimed participants owe ${formatMoney(claimedSum, currency)} — must equal ${formatMoney(batch.amountReceived, currency)} to confirm` : undefined}
-              >
-                Reconcile &amp; Confirm
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
-                Reconcile with variance
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" onClick={handleReopen} disabled={working}>
-              Reopen
+            <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
+              Edit
             </Button>
+            {batch.status === 'OPEN' ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleReconcileAndConfirm}
+                  disabled={working || !matches}
+                >
+                  Reconcile &amp; Confirm
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
+                  Reconcile with variance
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setShowReopen(true)} disabled={working}>
+                Reopen
+              </Button>
+            )}
+          </div>
+          {batch.status === 'OPEN' && !matches && (
+            <p className="text-xs text-amber-700">
+              {diff > 0
+                ? `Over by ${formatMoney(diff, currency)} — claimed ${formatMoney(claimedSum, currency)}, received ${formatMoney(batch.amountReceived, currency)}`
+                : claimedUnconfirmed.length === 0
+                  ? 'No participants have been claimed yet'
+                  : `Short by ${formatMoney(-diff, currency)} — claimed ${formatMoney(claimedSum, currency)}, received ${formatMoney(batch.amountReceived, currency)}`}
+            </p>
           )}
         </div>
       </div>
@@ -439,71 +415,6 @@ export function BatchDetailPage() {
         </>
       )}
 
-      <Separator className="mt-8" />
-
-      {/* Allocations (legacy CSV-upload flow) */}
-      <section className="mt-8">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Allocations
-        </h3>
-
-        {allocations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No allocations yet. Upload the returned roster CSV to allocate.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Participant</th>
-                  <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Amount</th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Allocated at</th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">By</th>
-                  <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {allocations.map((a) => (
-                  <tr key={a.id} className={`border-t ${a.voided ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-2.5">{a.participantName}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">
-                      {formatMoney(a.amount, currency)}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{formatTs(a.createdAt)}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[140px]">{a.createdBy}</td>
-                    <td className="px-4 py-2.5">
-                      {a.voided ? (
-                        <span className="text-xs text-muted-foreground">
-                          Voided{a.voidReason ? ` — ${a.voidReason}` : ''}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-emerald-600 font-medium">Active</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      {!a.voided && (
-                        <button
-                          type="button"
-                          onClick={() => setVoidTarget(a)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          Void
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {remaining !== 0 && batch.status === 'OPEN' && activeAllocations.length > 0 && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Legacy allocation balance: {formatMoney(remaining, currency)} unallocated
-          </p>
-        )}
-      </section>
-
       {/* Modals */}
       {showEdit && (
         <BatchForm
@@ -515,15 +426,13 @@ export function BatchDetailPage() {
           existing={batch}
         />
       )}
-      {showUpload && (
-        <AllocationsUploadModal
-          open={showUpload}
-          onClose={() => setShowUpload(false)}
-          onAllocated={loadBatch}
+      {showReopen && (
+        <ReopenDialog
           campId={campId!}
-          batch={batch}
-          participants={participants}
-          currency={currency}
+          batchId={batchId!}
+          referenceCode={batch.referenceCode}
+          onReopened={loadBatch}
+          onClose={() => setShowReopen(false)}
         />
       )}
       {showVariance && (
@@ -536,15 +445,6 @@ export function BatchDetailPage() {
           currency={currency}
           onReconciled={loadBatch}
           onClose={() => setShowVariance(false)}
-        />
-      )}
-      {voidTarget && (
-        <VoidDialog
-          allocation={voidTarget}
-          campId={campId!}
-          currency={currency}
-          onVoided={loadBatch}
-          onClose={() => setVoidTarget(null)}
         />
       )}
     </div>

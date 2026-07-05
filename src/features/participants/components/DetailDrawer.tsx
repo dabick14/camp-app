@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { DoorOpen, X, Plus } from 'lucide-react'
+import { AlertTriangle, DoorOpen, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Timestamp } from 'firebase/firestore'
 import { Badge } from '@/components/ui/badge'
@@ -154,6 +154,7 @@ export function DetailDrawer({
   const [busy, setBusy] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmUnassign, setConfirmUnassign] = useState(false)
+  const [confirmUndoCheckIn, setConfirmUndoCheckIn] = useState(false)
   const [confirmClearFlag, setConfirmClearFlag] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [editingNotes, setEditingNotes] = useState(false)
@@ -172,6 +173,7 @@ export function DetailDrawer({
   useEffect(() => {
     setConfirmCancel(false)
     setConfirmUnassign(false)
+    setConfirmUndoCheckIn(false)
     setConfirmClearFlag(false)
     setEditingNotes(false)
     setTagInput('')
@@ -392,8 +394,9 @@ export function DetailDrawer({
               {/* Override flag banner — permanent audit trail */}
               {p.roomedWithoutFullPayment && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive space-y-2">
-                  <p className="font-medium">
-                    ⚠️ Roomed with outstanding balance
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Roomed with outstanding balance
                     {p.roomedWithoutFullPaymentNote && (
                       <span className="font-normal"> — Reason: "{p.roomedWithoutFullPaymentNote}"</span>
                     )}
@@ -437,8 +440,9 @@ export function DetailDrawer({
 
               {/* Dynamic balance warning — shown only when flag isn't already set */}
               {!p.roomedWithoutFullPayment && !!p.roomId && paymentState !== 'PAID' && paymentState !== 'WAIVED' && (
-                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-                  ⚠️ Roomed with outstanding balance
+                <div className="flex items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Roomed with outstanding balance
                 </div>
               )}
 
@@ -621,7 +625,7 @@ export function DetailDrawer({
                           }
                         >
                           {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
-                            <span>⚠️</span>
+                            <AlertTriangle className="h-3.5 w-3.5" />
                           )}
                           <DoorOpen className="h-3.5 w-3.5" />
                           Change Room
@@ -664,15 +668,28 @@ export function DetailDrawer({
 
                         {/* Undo check-in (if checked in) */}
                         {p.checkInState === 'ARRIVED' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleUndoCheckIn}
-                            disabled={busy}
-                          >
-                            Undo check-in
-                          </Button>
+                          confirmUndoCheckIn ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Undo check-in?</span>
+                              <Button size="sm" variant="destructive" onClick={handleUndoCheckIn} disabled={busy}>
+                                Undo
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmUndoCheckIn(false)}>
+                                Keep
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmUndoCheckIn(true)}
+                              disabled={busy}
+                              className="text-muted-foreground"
+                            >
+                              Undo check-in
+                            </Button>
+                          )
                         )}
                       </div>
                     </>
@@ -699,22 +716,35 @@ export function DetailDrawer({
                           }
                         >
                           {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
-                            <span>⚠️</span>
+                            <AlertTriangle className="h-3.5 w-3.5" />
                           )}
                           <DoorOpen className="h-3.5 w-3.5" />
                           Assign Room
                         </Button>
 
                         {p.checkInState === 'ARRIVED' && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleUndoCheckIn}
-                            disabled={busy}
-                          >
-                            Undo check-in
-                          </Button>
+                          confirmUndoCheckIn ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Undo check-in?</span>
+                              <Button size="sm" variant="destructive" onClick={handleUndoCheckIn} disabled={busy}>
+                                Undo
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setConfirmUndoCheckIn(false)}>
+                                Keep
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmUndoCheckIn(true)}
+                              disabled={busy}
+                              className="text-muted-foreground"
+                            >
+                              Undo check-in
+                            </Button>
+                          )
                         )}
                       </div>
                     </>

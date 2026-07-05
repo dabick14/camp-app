@@ -58,6 +58,15 @@ export const setPaymentClaim = onCall<SetPaymentClaimData>({ enforceAppCheck: tr
     )
   }
 
+  // Confirmation lock: once reconcileAndConfirm has set confirmedBatchId, the
+  // claim is permanently locked. Un-confirming is a Phase 2 admin-only concern.
+  if (participant.confirmedBatchId) {
+    throw new HttpsError(
+      'failed-precondition',
+      'This payment has been confirmed and can no longer be changed.',
+    )
+  }
+
   const now = FieldValue.serverTimestamp()
 
   if (claimed) {

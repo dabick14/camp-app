@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { ChevronLeft, CreditCard, LayoutGrid, DoorOpen, RefreshCw, Settings, Users, UserCog } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, CreditCard, LayoutGrid, DoorOpen, RefreshCw, Settings, Users, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { formatDateRange } from '@/lib/dates'
@@ -8,10 +8,14 @@ import { derivePaymentState } from '@/features/participants/types'
 import { LogoutButton } from '@/features/auth/LogoutButton'
 import { CampDataProvider, useCampData } from './CampDataContext'
 
-function MetricCard({ label, value }: { label: string; value: number }) {
+function MetricCard({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+  const alert = warn && value > 0
   return (
     <div className="flex min-w-[72px] flex-col px-4 py-2">
-      <span className="text-2xl font-semibold tabular-nums leading-none">{value}</span>
+      <div className="flex items-center gap-1">
+        {alert && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
+        <span className={`text-2xl font-semibold tabular-nums leading-none ${alert ? 'text-red-700' : ''}`}>{value}</span>
+      </div>
       <span className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
     </div>
   )
@@ -23,15 +27,16 @@ function CampLayoutInner() {
 
   const metrics = useMemo(() => {
     const active = participants.filter((p) => p.registrationState === 'REGISTERED')
-    let paid = 0, partial = 0, pending = 0, roomed = 0
+    let paid = 0, partial = 0, pending = 0, roomed = 0, overrides = 0
     for (const p of active) {
       const ps = derivePaymentState(p)
       if (ps === 'PAID') paid++
       else if (ps === 'PARTIAL') partial++
       else if (ps === 'PENDING') pending++
       if (p.roomId) roomed++
+      if (p.roomedWithoutFullPayment) overrides++
     }
-    return { registered: active.length, paid, partial, pending, roomed }
+    return { registered: active.length, paid, partial, pending, roomed, overrides }
   }, [participants])
 
   const base = `/admin/camps/${campId}`
@@ -83,6 +88,8 @@ function CampLayoutInner() {
           <MetricCard label="Pending" value={metrics.pending} />
           <Separator orientation="vertical" className="h-10" />
           <MetricCard label="Roomed" value={metrics.roomed} />
+          <Separator orientation="vertical" className="h-10" />
+          <MetricCard label="Overrides" value={metrics.overrides} warn />
           <Separator orientation="vertical" className="h-10" />
           <Link
             to={`${base}/dashboard`}

@@ -39,6 +39,7 @@ export function LoginForm({
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoFocus
+                className="h-11"
               />
             </div>
             <div className="space-y-2">
@@ -49,10 +50,11 @@ export function LoginForm({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="h-11"
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" size="xl" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
             <p className="text-center text-sm">
