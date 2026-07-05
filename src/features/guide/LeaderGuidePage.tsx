@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Card, CardContent } from '@/components/ui/card'
 
 function Callout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,8 +20,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function LeaderGuidePage() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-5 py-10 text-base leading-relaxed text-foreground">
+    <div className="min-h-screen bg-background px-4 py-10">
+      <Card className="mx-auto max-w-2xl shadow-sm">
+      <CardContent className="px-6 py-8 text-base leading-relaxed text-foreground sm:px-10 sm:py-10">
 
         {/* Header */}
         <div className="mb-8">
@@ -176,7 +178,8 @@ export function LeaderGuidePage() {
           </p>
         </div>
 
-      </div>
+      </CardContent>
+      </Card>
     </div>
   )
 }

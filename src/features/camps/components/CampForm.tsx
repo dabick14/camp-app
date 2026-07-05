@@ -149,13 +149,22 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
         <Textarea {...register('description')} rows={3} placeholder="Optional description" />
       </Field>
 
-      <div className="flex items-center gap-3">
-        <Switch
-          id="registrationOpen"
-          checked={registrationOpen}
-          onCheckedChange={(v) => setValue('registrationOpen', v)}
-        />
-        <Label htmlFor="registrationOpen">Registration open</Label>
+      {/* Registration open — blast-radius control */}
+      <div className="rounded-lg border-2 border-amber-200 bg-amber-50/50 px-4 py-4 dark:border-amber-700/40 dark:bg-amber-950/20">
+        <div className="flex items-start gap-3">
+          <Switch
+            id="registrationOpen"
+            checked={registrationOpen}
+            onCheckedChange={(v) => setValue('registrationOpen', v)}
+            className="mt-0.5 shrink-0"
+          />
+          <div>
+            <Label htmlFor="registrationOpen" className="font-medium">Registration open</Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Closing this immediately stops all leaders from registering new participants camp-wide.
+            </p>
+          </div>
+        </div>
       </div>
 
       <Button type="submit" disabled={isSubmitting}>

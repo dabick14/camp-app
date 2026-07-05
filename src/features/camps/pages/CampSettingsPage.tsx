@@ -101,7 +101,7 @@ export function CampSettingsPage() {
 
       <CampForm defaultValues={defaultValues} onSubmit={handleSubmit} submitLabel="Save changes" />
 
-      {saved && <p className="mt-3 text-sm text-green-600">Changes saved.</p>}
+      {saved && <p className="mt-3 text-sm text-emerald-600">Changes saved.</p>}
 
       <Separator className="my-8" />
 

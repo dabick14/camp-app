@@ -300,36 +300,46 @@ export function BatchDetailPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => downloadRosterCsv(sgParticipants, batch.subGroupName, batch.referenceCode)}
-          >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download roster
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
-            Edit
-          </Button>
-          {batch.status === 'OPEN' ? (
-            <>
-              <Button
-                size="sm"
-                onClick={handleReconcileAndConfirm}
-                disabled={working || !matches}
-                title={!matches ? `Claimed participants owe ${formatMoney(claimedSum, currency)} — must equal ${formatMoney(batch.amountReceived, currency)} to confirm` : undefined}
-              >
-                Reconcile &amp; Confirm
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
-                Reconcile with variance
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setShowReopen(true)} disabled={working}>
-              Reopen
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadRosterCsv(sgParticipants, batch.subGroupName, batch.referenceCode)}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Download roster
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
+              Edit
+            </Button>
+            {batch.status === 'OPEN' ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={handleReconcileAndConfirm}
+                  disabled={working || !matches}
+                >
+                  Reconcile &amp; Confirm
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
+                  Reconcile with variance
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setShowReopen(true)} disabled={working}>
+                Reopen
+              </Button>
+            )}
+          </div>
+          {batch.status === 'OPEN' && !matches && (
+            <p className="text-xs text-amber-700">
+              {diff > 0
+                ? `Over by ${formatMoney(diff, currency)} — claimed ${formatMoney(claimedSum, currency)}, received ${formatMoney(batch.amountReceived, currency)}`
+                : claimedUnconfirmed.length === 0
+                  ? 'No participants have been claimed yet'
+                  : `Short by ${formatMoney(-diff, currency)} — claimed ${formatMoney(claimedSum, currency)}, received ${formatMoney(batch.amountReceived, currency)}`}
+            </p>
           )}
         </div>
       </div>

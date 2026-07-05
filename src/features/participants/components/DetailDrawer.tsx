@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { DoorOpen, X, Plus } from 'lucide-react'
+import { AlertTriangle, DoorOpen, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Timestamp } from 'firebase/firestore'
 import { Badge } from '@/components/ui/badge'
@@ -394,8 +394,9 @@ export function DetailDrawer({
               {/* Override flag banner — permanent audit trail */}
               {p.roomedWithoutFullPayment && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive space-y-2">
-                  <p className="font-medium">
-                    ⚠️ Roomed with outstanding balance
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Roomed with outstanding balance
                     {p.roomedWithoutFullPaymentNote && (
                       <span className="font-normal"> — Reason: "{p.roomedWithoutFullPaymentNote}"</span>
                     )}
@@ -439,8 +440,9 @@ export function DetailDrawer({
 
               {/* Dynamic balance warning — shown only when flag isn't already set */}
               {!p.roomedWithoutFullPayment && !!p.roomId && paymentState !== 'PAID' && paymentState !== 'WAIVED' && (
-                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
-                  ⚠️ Roomed with outstanding balance
+                <div className="flex items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Roomed with outstanding balance
                 </div>
               )}
 
@@ -623,7 +625,7 @@ export function DetailDrawer({
                           }
                         >
                           {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
-                            <span>⚠️</span>
+                            <AlertTriangle className="h-3.5 w-3.5" />
                           )}
                           <DoorOpen className="h-3.5 w-3.5" />
                           Change Room
@@ -714,7 +716,7 @@ export function DetailDrawer({
                           }
                         >
                           {(paymentState === 'PENDING' || paymentState === 'PARTIAL') && (
-                            <span>⚠️</span>
+                            <AlertTriangle className="h-3.5 w-3.5" />
                           )}
                           <DoorOpen className="h-3.5 w-3.5" />
                           Assign Room
