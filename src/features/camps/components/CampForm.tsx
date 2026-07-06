@@ -161,7 +161,7 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
           <div>
             <Label htmlFor="registrationOpen" className="font-medium">Registration open</Label>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Closing this immediately stops all leaders from registering new participants camp-wide.
+              Closing this immediately stops all coordinators from registering new participants camp-wide.
             </p>
           </div>
         </div>

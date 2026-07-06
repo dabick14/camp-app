@@ -75,7 +75,7 @@ export function OverridePaymentModal({
                 autoFocus
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Council leader confirmed cash on hand, Sponsorship being processed"
+                placeholder="e.g. Council coordinator confirmed cash on hand, Sponsorship being processed"
                 rows={3}
                 className="text-sm"
               />

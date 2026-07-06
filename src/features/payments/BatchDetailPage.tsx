@@ -385,7 +385,7 @@ export function BatchDetailPage() {
             </h3>
             {claimedUnconfirmed.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No participants have been claimed by the leader yet.
+                No participants have been claimed by the coordinator yet.
               </p>
             ) : (
               <div className="overflow-x-auto rounded-md border">

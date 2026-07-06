@@ -183,7 +183,7 @@ export function AllocationsUploadModal({
           {/* File picker */}
           <div>
             <p className="mb-2 text-sm text-muted-foreground">
-              Upload the roster CSV returned by the sub-group leader. The system reads
+              Upload the roster CSV returned by the sub-group coordinator. The system reads
               only <code className="font-mono text-xs">participantId</code> and{' '}
               <code className="font-mono text-xs">amountPaid</code> columns.
               Blank <code className="font-mono text-xs">amountPaid</code> rows are skipped.

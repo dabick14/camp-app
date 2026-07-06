@@ -55,7 +55,7 @@ export function LeadersPage() {
 
   function handleProvisioned(subGroupName: string, email: string) {
     setShowProvisionModal(false)
-    toast.success(`${email} added as leader for ${subGroupName}. A set-password email was sent.`)
+    toast.success(`${email} added as coordinator for ${subGroupName}. A set-password email was sent.`)
     refetch()
   }
 
@@ -79,15 +79,15 @@ export function LeadersPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.message ?? data.error ?? 'Failed to update leader')
+        throw new Error(data.message ?? data.error ?? 'Failed to update coordinator')
       }
 
       setLeaders((prev) =>
         prev.map((l) => (l.id === leader.id ? { ...l, active: !leader.active } : l)),
       )
-      toast.success(leader.active ? `${leader.subGroupName}'s leader deactivated` : `${leader.subGroupName}'s leader reactivated`)
+      toast.success(leader.active ? `${leader.subGroupName}'s coordinator deactivated` : `${leader.subGroupName}'s coordinator reactivated`)
     } catch (err: unknown) {
-      toast.error((err as Error)?.message ?? 'Failed to update leader')
+      toast.error((err as Error)?.message ?? 'Failed to update coordinator')
     } finally {
       setBusyUid(null)
       setConfirmToggleUid(null)
@@ -97,10 +97,10 @@ export function LeadersPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Leaders</h1>
+        <h1 className="text-2xl font-semibold">Coordinators</h1>
         <Button onClick={() => setShowProvisionModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add leader
+          Add coordinator
         </Button>
       </div>
 
@@ -108,9 +108,9 @@ export function LeadersPage() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : leaders.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
-          <p className="text-muted-foreground">No leaders yet.</p>
+          <p className="text-muted-foreground">No coordinators yet.</p>
           <Button className="mt-4" onClick={() => setShowProvisionModal(true)}>
-            Add your first leader
+            Add your first coordinator
           </Button>
         </div>
       ) : (

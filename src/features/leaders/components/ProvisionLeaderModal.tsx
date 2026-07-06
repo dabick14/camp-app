@@ -85,7 +85,7 @@ export function ProvisionLeaderModal({
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.message ?? data.error ?? 'Failed to provision leader.')
+        setError(data.message ?? data.error ?? 'Failed to provision coordinator.')
         return
       }
 
@@ -101,7 +101,7 @@ export function ProvisionLeaderModal({
     <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose() }}>
       <DialogContent className="max-w-md" showCloseButton={!saving}>
         <DialogHeader>
-          <DialogTitle>Add leader</DialogTitle>
+          <DialogTitle>Add coordinator</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -143,7 +143,7 @@ export function ProvisionLeaderModal({
             </Select>
             {availableSubGroups.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                Every sub-group already has an active leader.
+                Every sub-group already has an active coordinator.
               </p>
             )}
           </div>
@@ -155,7 +155,7 @@ export function ProvisionLeaderModal({
               Cancel
             </Button>
             <Button type="submit" disabled={saving || availableSubGroups.length === 0}>
-              {saving ? 'Adding…' : 'Add leader'}
+              {saving ? 'Adding…' : 'Add coordinator'}
             </Button>
           </DialogFooter>
         </form>
