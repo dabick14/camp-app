@@ -65,7 +65,7 @@ export function LoginForm({
             <p className="text-center text-sm text-muted-foreground">
               New here?{' '}
               <Link to="/guide" className="hover:text-foreground hover:underline">
-                Read the leader guide
+                Read the coordinator guide
               </Link>
             </p>
           </form>

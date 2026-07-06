@@ -105,7 +105,7 @@ function CampLayoutInner() {
             { to: base, end: true, label: 'Participants', icon: Users },
             { to: `${base}/dashboard`, end: false, label: 'Dashboard', icon: LayoutGrid },
             { to: `${base}/rooms`, end: false, label: 'Rooms', icon: DoorOpen },
-            { to: `${base}/leaders`, end: false, label: 'Leaders', icon: UserCog },
+            { to: `${base}/leaders`, end: false, label: 'Coordinators', icon: UserCog },
             { to: `${base}/payments`, end: false, label: 'Payments', icon: CreditCard },
             { to: `${base}/settings`, end: false, label: 'Settings', icon: Settings },
           ].map(({ to, end, label, icon: Icon }) => (

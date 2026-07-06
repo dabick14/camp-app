@@ -26,7 +26,7 @@ export function LeaderGuidePage() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Sub-Group Leader Guide</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Sub-Group Coordinator Guide</h1>
           <p className="mt-2 text-muted-foreground">
             A quick guide to registering your people and recording payments for camp.
           </p>
