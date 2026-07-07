@@ -209,3 +209,85 @@ describe('participants rules — unauthenticated access denied', () => {
     )
   })
 })
+
+// ── Room-type change lock (confirmed participants) ────────────────────────────
+// Once confirmedBatchId is set, writes that touch feeOwed or roomTypePreference*
+// are blocked even for admins — changing the fee silently corrupts the PAID→PARTIAL
+// paymentState derivation. Other field updates remain allowed.
+
+describe('participants rules — admin cannot change feeOwed/roomTypePreferenceId on confirmed participant', () => {
+  const confirmedParticipantId = 'p-confirmed'
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore()
+        .doc(`camps/${campId}/participants/${confirmedParticipantId}`)
+        .set({
+          fullName: 'Confirmed Person',
+          phone: '0244999888',
+          gender: 'M',
+          subGroupId: sgId,
+          subGroupName: 'Council A',
+          roomTypePreferenceId: 'rt-standard',
+          roomTypePreferenceName: 'Standard',
+          feeOwed: 400,
+          amountPaid: 400,
+          paymentClaimed: true,
+          confirmedBatchId: 'batch-001',
+          registrationState: 'REGISTERED',
+          checkInState: 'NOT_ARRIVED',
+          tags: [],
+        })
+    })
+  })
+
+  it('allows admin to change room type on an unconfirmed participant (control)', async () => {
+    const ctx = testEnv.authenticatedContext(adminUid)
+    await assertSucceeds(
+      ctx.firestore().doc(`camps/${campId}/participants/${participantId}`).update({
+        feeOwed: 500,
+        roomTypePreferenceId: 'rt-deluxe',
+        roomTypePreferenceName: 'Deluxe',
+        updatedAt: new Date(),
+        updatedBy: adminUid,
+      }),
+    )
+  })
+
+  it('denies admin changing feeOwed on a confirmed participant', async () => {
+    const ctx = testEnv.authenticatedContext(adminUid)
+    await assertFails(
+      ctx.firestore().doc(`camps/${campId}/participants/${confirmedParticipantId}`).update({
+        feeOwed: 500,
+        roomTypePreferenceId: 'rt-deluxe',
+        roomTypePreferenceName: 'Deluxe',
+        updatedAt: new Date(),
+        updatedBy: adminUid,
+      }),
+    )
+  })
+
+  it('denies admin changing only roomTypePreferenceId on a confirmed participant', async () => {
+    const ctx = testEnv.authenticatedContext(adminUid)
+    await assertFails(
+      ctx.firestore().doc(`camps/${campId}/participants/${confirmedParticipantId}`).update({
+        roomTypePreferenceId: 'rt-deluxe',
+        roomTypePreferenceName: 'Deluxe',
+        updatedAt: new Date(),
+        updatedBy: adminUid,
+      }),
+    )
+  })
+
+  it('allows admin to update non-fee fields (notes, tags) on a confirmed participant', async () => {
+    const ctx = testEnv.authenticatedContext(adminUid)
+    await assertSucceeds(
+      ctx.firestore().doc(`camps/${campId}/participants/${confirmedParticipantId}`).update({
+        notes: 'Late arrival confirmed by coordinator',
+        tags: ['Worker'],
+        updatedAt: new Date(),
+        updatedBy: adminUid,
+      }),
+    )
+  })
+})

@@ -327,6 +327,12 @@ export function DetailDrawer({
 
   const newRoomTypeFee = roomTypes.find((r) => r.id === selectedRTId)?.price
 
+  const roomTypeChangeBlock = p?.confirmedBatchId
+    ? "Payment is confirmed — room type can't be changed. Reversing a confirmed payment isn't supported in v1."
+    : p?.paymentClaimed
+    ? 'This participant is claimed for payment — clear the claim before changing their room type.'
+    : null
+
   // ─── render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -504,16 +510,21 @@ export function DetailDrawer({
                 <Row
                   label="Room type"
                   value={
-                    <span className="flex items-center gap-2">
-                      {p.roomTypePreferenceName}
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedRTId(p.roomTypePreferenceId); setShowRTModal(true) }}
-                        className="text-xs text-primary hover:underline disabled:opacity-50"
-                        disabled={busy}
-                      >
-                        Change
-                      </button>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        {p.roomTypePreferenceName}
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedRTId(p.roomTypePreferenceId); setShowRTModal(true) }}
+                          className="text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={busy || !!roomTypeChangeBlock}
+                        >
+                          Change
+                        </button>
+                      </span>
+                      {roomTypeChangeBlock && (
+                        <span className="text-xs text-muted-foreground">{roomTypeChangeBlock}</span>
+                      )}
                     </span>
                   }
                 />
