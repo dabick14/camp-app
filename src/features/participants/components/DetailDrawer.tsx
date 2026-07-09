@@ -113,18 +113,20 @@ export function DetailDrawer({
 
   // ─── allocations ─────────────────────────────────────────────────────────────
   const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [allocError, setAllocError] = useState(false)
   const [voidTarget, setVoidTarget] = useState<Allocation | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
 
   const loadAllocations = useCallback(async () => {
     if (!campId || !participant) return
+    setAllocError(false)
     try {
       const allocs = await listAllocationsByParticipant(campId, participant.id)
       allocs.sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
       setAllocations(allocs)
     } catch {
-      // non-fatal; don't block the drawer
+      setAllocError(true)
     }
   }, [campId, participant])
 
@@ -327,6 +329,12 @@ export function DetailDrawer({
 
   const newRoomTypeFee = roomTypes.find((r) => r.id === selectedRTId)?.price
 
+  const roomTypeChangeBlock = p?.confirmedBatchId
+    ? "Payment is confirmed — room type can't be changed. Reversing a confirmed payment isn't supported in v1."
+    : p?.paymentClaimed
+    ? 'This participant is claimed for payment — clear the claim before changing their room type.'
+    : null
+
   // ─── render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -504,16 +512,21 @@ export function DetailDrawer({
                 <Row
                   label="Room type"
                   value={
-                    <span className="flex items-center gap-2">
-                      {p.roomTypePreferenceName}
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedRTId(p.roomTypePreferenceId); setShowRTModal(true) }}
-                        className="text-xs text-primary hover:underline disabled:opacity-50"
-                        disabled={busy}
-                      >
-                        Change
-                      </button>
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        {p.roomTypePreferenceName}
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedRTId(p.roomTypePreferenceId); setShowRTModal(true) }}
+                          className="text-xs text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={busy || !!roomTypeChangeBlock}
+                        >
+                          Change
+                        </button>
+                      </span>
+                      {roomTypeChangeBlock && (
+                        <span className="text-xs text-muted-foreground">{roomTypeChangeBlock}</span>
+                      )}
                     </span>
                   }
                 />
@@ -556,7 +569,19 @@ export function DetailDrawer({
                 )}
 
                 {/* Allocations list */}
-                {allocations.length > 0 && (
+                {allocError && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Couldn't load payment history.{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => loadAllocations()}
+                    >
+                      Retry
+                    </button>
+                  </p>
+                )}
+                {!allocError && allocations.length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground">Allocations</p>
                     {allocations.map((a) => (

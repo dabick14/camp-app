@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Plus, RefreshCw } from 'lucide-react'
+import { PageError } from '@/components/ui/states'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -34,17 +35,20 @@ export function PaymentsPage() {
 
   const [batches, setBatches] = useState<PaymentBatch[]>([])
   const [batchesLoading, setBatchesLoading] = useState(true)
+  const [batchesError, setBatchesError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [sgFilter, setSgFilter] = useState<string>('all')
 
   const loadBatches = useCallback(async () => {
     if (!campId) return
     setBatchesLoading(true)
+    setBatchesError('')
     try {
       const result = await listBatches(campId)
-      // Sort newest-first by createdAt
       result.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis())
       setBatches(result)
+    } catch (err) {
+      setBatchesError((err as Error).message ?? 'Failed to load batches')
     } finally {
       setBatchesLoading(false)
     }
@@ -214,6 +218,8 @@ export function PaymentsPage() {
 
         {batchesLoading ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Loading batches…</p>
+        ) : batchesError ? (
+          <PageError message={batchesError} onRetry={loadBatches} />
         ) : filteredBatches.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             {batches.length === 0 ? 'No batches yet.' : 'No batches for this sub-group.'}

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatMoney } from '@/lib/formatMoney'
+import { withTimeout } from '@/lib/withTimeout'
 import { functions } from '@/lib/firebase'
 import { getCamp } from '@/features/camps/services/campService'
 import { listRoomTypes } from '@/features/rooms/services/roomTypeService'
@@ -131,7 +132,9 @@ export function LeaderRegisterPage() {
     if (!campId || !subGroupId) return
     let cancelled = false
 
-    Promise.all([getCamp(campId), listRoomTypes(campId), isSubGroupGated(campId, subGroupId)])
+    withTimeout(
+      Promise.all([getCamp(campId), listRoomTypes(campId), isSubGroupGated(campId, subGroupId)]),
+    )
       .then(([campData, types, gated]) => {
         if (cancelled) return
         if (!campData) { setPageStatus('error'); return }

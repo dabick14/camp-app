@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PageError, PageLoading } from '@/components/ui/states'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
@@ -12,10 +13,10 @@ import { formatMoney } from '@/lib/formatMoney'
 function BigMetric({ label, value, sub, warn }: { label: string; value: number; sub?: string; warn?: boolean }) {
   const alert = warn && value > 0
   return (
-    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-red-200 bg-red-50 text-red-900' : 'bg-card text-card-foreground'}`}>
+    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200' : 'bg-card text-card-foreground'}`}>
       <div className="flex items-center gap-1.5">
         {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />}
-        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-red-700' : ''}`}>{value.toLocaleString()}</p>
+        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-red-700 dark:text-red-400' : ''}`}>{value.toLocaleString()}</p>
       </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
@@ -23,25 +24,21 @@ function BigMetric({ label, value, sub, warn }: { label: string; value: number; 
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-3 text-base font-semibold">{title}</h2>
-      {children}
-    </section>
-  )
-}
-
 export function DashboardPage() {
-  const { camp, participants, subGroups, roomTypes, rooms, loading, refresh } = useCampData()
+  const { camp, participants, subGroups, roomTypes, rooms, loading, error, refresh } = useCampData()
   const currency = camp?.currency ?? 'GHS'
+
+  // Track which tabs have been opened so we can lazily compute their breakdowns.
+  // By sub-group is the default tab — it's always computed.
+  const [seenRoomType, setSeenRoomType] = useState(false)
+  const [seenGender, setSeenGender] = useState(false)
 
   const active = useMemo(
     () => participants.filter((p) => p.registrationState === 'REGISTERED'),
     [participants],
   )
 
-  // ─── top-level metrics ──────────────────────────────────────────────────────
+  // ─── top-level metrics (always needed — power the summary cards) ────────────
   const metrics = useMemo(() => {
     let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0, overrides = 0
     for (const p of active) {
@@ -56,7 +53,7 @@ export function DashboardPage() {
     return { registered: active.length, paid, partial, pending, waived, roomed, overrides }
   }, [active])
 
-  // ─── per sub-group ──────────────────────────────────────────────────────────
+  // ─── By sub-group (default tab — computed immediately) ─────────────────────
   const bySubGroup = useMemo(() => {
     const map = new Map<string, {
       name: string; registered: number; paid: number; partial: number;
@@ -84,8 +81,9 @@ export function DashboardPage() {
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [active, subGroups])
 
-  // ─── per room type ──────────────────────────────────────────────────────────
+  // ─── By room type (lazy — only computed after first visit to that tab) ──────
   const byRoomType = useMemo(() => {
+    if (!seenRoomType) return null
     return roomTypes.map((rt) => {
       const preferredBy = active.filter((p) => p.roomTypePreferenceId === rt.id).length
       const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
@@ -96,10 +94,11 @@ export function DashboardPage() {
         preferredBy, capacityTotal, occupied, available: capacityTotal - occupied,
       }
     })
-  }, [active, roomTypes, rooms])
+  }, [seenRoomType, active, roomTypes, rooms])
 
-  // ─── per gender ─────────────────────────────────────────────────────────────
+  // ─── By gender (lazy — only computed after first visit to that tab) ─────────
   const byGender = useMemo(() => {
+    if (!seenGender) return null
     const male = { registered: 0, roomed: 0, capacity: 0, available: 0 }
     const female = { registered: 0, roomed: 0, capacity: 0, available: 0 }
     for (const p of active) {
@@ -116,7 +115,12 @@ export function DashboardPage() {
       { label: 'Male', ...male },
       { label: 'Female', ...female },
     ]
-  }, [active, rooms])
+  }, [seenGender, active, rooms])
+
+  function handleTabChange(value: string) {
+    if (value === 'by-rt') setSeenRoomType(true)
+    if (value === 'by-gender') setSeenGender(true)
+  }
 
   return (
     <div className="px-6 py-6">
@@ -129,7 +133,11 @@ export function DashboardPage() {
         </Button>
       </div>
 
-      {/* Big metric cards */}
+      {loading && <PageLoading />}
+      {!loading && error && <PageError message={error} onRetry={refresh} />}
+      {loading || error ? null : <>
+
+      {/* Summary cards — always above the tabs */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <BigMetric label="Registered" value={metrics.registered} />
         <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} />
@@ -139,9 +147,16 @@ export function DashboardPage() {
         <BigMetric label="Overrides" value={metrics.overrides} warn />
       </div>
 
-      <div className="space-y-10">
-        {/* By sub-group */}
-        <Section title="By Sub-Group">
+      {/* Tabbed breakdowns */}
+      <Tabs defaultValue="by-sg" onValueChange={handleTabChange}>
+        <TabsList className="mb-4 w-full justify-start sm:w-auto">
+          <TabsTrigger value="by-sg">By sub-group</TabsTrigger>
+          <TabsTrigger value="by-rt">By room type</TabsTrigger>
+          <TabsTrigger value="by-gender">By gender</TabsTrigger>
+        </TabsList>
+
+        {/* ── By sub-group ───────────────────────────────────────────────────── */}
+        <TabsContent value="by-sg">
           <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
@@ -186,88 +201,89 @@ export function DashboardPage() {
               </TableBody>
             </Table>
           </div>
-        </Section>
+        </TabsContent>
 
-        <Separator />
-
-        {/* By room type */}
-        <Section title="By Room Type">
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Room type</TableHead>
-                  <TableHead className="text-right">Price ({currency})</TableHead>
-                  <TableHead className="text-right">Preferred by</TableHead>
-                  <TableHead className="text-right">Total capacity</TableHead>
-                  <TableHead className="text-right">Occupied</TableHead>
-                  <TableHead className="text-right">Available</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {byRoomType.length === 0 ? (
+        {/* ── By room type ───────────────────────────────────────────────────── */}
+        <TabsContent value="by-rt">
+          {byRoomType === null ? null : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No room types
-                    </TableCell>
+                    <TableHead>Room type</TableHead>
+                    <TableHead className="text-right">Price ({currency})</TableHead>
+                    <TableHead className="text-right">Preferred by</TableHead>
+                    <TableHead className="text-right">Total capacity</TableHead>
+                    <TableHead className="text-right">Occupied</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
                   </TableRow>
-                ) : (
-                  byRoomType.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">{row.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.price, currency)}
+                </TableHeader>
+                <TableBody>
+                  {byRoomType.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No room types
                       </TableCell>
-                      <TableCell className="text-right">{row.preferredBy}</TableCell>
-                      <TableCell className="text-right">{row.capacityTotal}</TableCell>
-                      <TableCell className="text-right">{row.occupied}</TableCell>
+                    </TableRow>
+                  ) : (
+                    byRoomType.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(row.price, currency)}
+                        </TableCell>
+                        <TableCell className="text-right">{row.preferredBy}</TableCell>
+                        <TableCell className="text-right">{row.capacityTotal}</TableCell>
+                        <TableCell className="text-right">{row.occupied}</TableCell>
+                        <TableCell
+                          className={`text-right ${row.available <= 0 ? 'font-medium text-red-600' : 'text-emerald-600'}`}
+                        >
+                          {row.available}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── By gender ──────────────────────────────────────────────────────── */}
+        <TabsContent value="by-gender">
+          {byGender === null ? null : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Gender</TableHead>
+                    <TableHead className="text-right">Registered</TableHead>
+                    <TableHead className="text-right">Roomed</TableHead>
+                    <TableHead className="text-right">Total capacity</TableHead>
+                    <TableHead className="text-right">Available</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {byGender.map((row) => (
+                    <TableRow key={row.label}>
+                      <TableCell className="font-medium">{row.label}</TableCell>
+                      <TableCell className="text-right">{row.registered}</TableCell>
+                      <TableCell className="text-right">{row.roomed}</TableCell>
+                      <TableCell className="text-right">{row.capacity}</TableCell>
                       <TableCell
-                        className={`text-right ${row.available <= 0 ? 'text-red-600 font-medium' : 'text-emerald-600'}`}
+                        className={`text-right ${row.available <= 0 ? 'font-medium text-red-600' : ''}`}
                       >
                         {row.available}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Section>
-
-        <Separator />
-
-        {/* By gender */}
-        <Section title="By Gender">
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Gender</TableHead>
-                  <TableHead className="text-right">Registered</TableHead>
-                  <TableHead className="text-right">Roomed</TableHead>
-                  <TableHead className="text-right">Total capacity</TableHead>
-                  <TableHead className="text-right">Available</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {byGender.map((row) => (
-                  <TableRow key={row.label}>
-                    <TableCell className="font-medium">{row.label}</TableCell>
-                    <TableCell className="text-right">{row.registered}</TableCell>
-                    <TableCell className="text-right">{row.roomed}</TableCell>
-                    <TableCell className="text-right">{row.capacity}</TableCell>
-                    <TableCell
-                      className={`text-right ${row.available <= 0 ? 'text-red-600 font-medium' : ''}`}
-                    >
-                      {row.available}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Section>
-      </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+      </>}
     </div>
   )
 }
