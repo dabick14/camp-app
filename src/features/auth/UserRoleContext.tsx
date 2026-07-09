@@ -70,7 +70,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const leaderData = leaderSnap.data()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const leaderData = leaderSnap.data() as any
       if (leaderSnap.exists() && leaderData?.active === true) {
         setRole({
           type: 'leader',
