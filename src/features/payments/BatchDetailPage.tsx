@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import { PageError, PageLoading } from '@/components/ui/states'
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -205,6 +206,7 @@ export function BatchDetailPage() {
 
   const [batch, setBatch] = useState<PaymentBatch | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [working, setWorking] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showReopen, setShowReopen] = useState(false)
@@ -213,6 +215,7 @@ export function BatchDetailPage() {
   const loadBatch = useCallback(async () => {
     if (!campId || !batchId) return
     setLoading(true)
+    setLoadError('')
     try {
       const snap = await getDoc(doc(db, 'camps', campId, 'paymentBatches', batchId))
       if (!snap.exists()) {
@@ -222,8 +225,7 @@ export function BatchDetailPage() {
       }
       setBatch({ id: snap.id, ...snap.data() } as PaymentBatch)
     } catch (err) {
-      console.error('[BatchDetailPage] loadBatch failed:', err)
-      toast.error((err as Error).message ?? 'Failed to load batch')
+      setLoadError((err as Error).message ?? 'Failed to load batch')
     } finally {
       setLoading(false)
     }
@@ -231,7 +233,12 @@ export function BatchDetailPage() {
 
   useEffect(() => { loadBatch() }, [loadBatch])
 
-  if (loading) return <div className="px-6 py-6 text-sm text-muted-foreground">Loading…</div>
+  if (loading) return <div className="px-6 py-6"><PageLoading /></div>
+  if (loadError) return (
+    <div className="px-6 py-6">
+      <PageError message={loadError} onRetry={loadBatch} />
+    </div>
+  )
   if (!batch) return null
 
   const sgParticipants = participants.filter((p) => p.subGroupId === batch.subGroupId)

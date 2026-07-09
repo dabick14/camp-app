@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
+import { toast } from 'sonner'
+import { PageError, PageLoading } from '@/components/ui/states'
 import { Separator } from '@/components/ui/separator'
 import { auth } from '@/lib/firebase'
 import { dateStrToTs, tsToDateStr } from '@/lib/dates'
@@ -17,50 +19,55 @@ export function CampSettingsPage() {
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
+  const loadCamp = useCallback(async () => {
     if (!id) return
-    let cancelled = false
-    getCamp(id)
-      .then((data) => {
-        if (cancelled) return
-        if (!data) setError('Camp not found.')
-        else setCamp(data)
-        setLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) { setError('Failed to load camp.'); setLoading(false) }
-      })
-    return () => { cancelled = true }
+    setLoading(true)
+    setError('')
+    try {
+      const data = await getCamp(id)
+      if (!data) setError('Camp not found.')
+      else setCamp(data)
+    } catch {
+      setError('Failed to load camp.')
+    } finally {
+      setLoading(false)
+    }
   }, [id])
+
+  useEffect(() => { loadCamp() }, [loadCamp])
 
   async function handleSubmit(values: CampFormValues) {
     if (!id) return
     const uid = auth.currentUser!.uid
-    await updateCamp(
-      id,
-      {
-        name: values.name,
-        location: values.location,
-        startDate: dateStrToTs(values.startDate),
-        endDate: dateStrToTs(values.endDate),
-        description: values.description?.trim() || undefined,
-        imageUrl: values.imageUrl?.trim() || undefined,
-        minAge: values.minAge,
-        maxAge: values.maxAge,
-        maxParticipants: values.maxParticipants,
-        currency: values.currency,
-        registrationOpen: values.registrationOpen,
-      },
-      uid,
-    )
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    try {
+      await updateCamp(
+        id,
+        {
+          name: values.name,
+          location: values.location,
+          startDate: dateStrToTs(values.startDate),
+          endDate: dateStrToTs(values.endDate),
+          description: values.description?.trim() || undefined,
+          imageUrl: values.imageUrl?.trim() || undefined,
+          minAge: values.minAge,
+          maxAge: values.maxAge,
+          maxParticipants: values.maxParticipants,
+          currency: values.currency,
+          registrationOpen: values.registrationOpen,
+        },
+        uid,
+      )
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      toast.error((err as Error).message ?? 'Failed to save changes')
+    }
   }
 
   if (loading) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-8">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <PageLoading />
       </div>
     )
   }
@@ -68,7 +75,7 @@ export function CampSettingsPage() {
   if (error || !camp) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-8">
-        <p className="text-sm text-destructive">{error || 'Camp not found.'}</p>
+        <PageError message={error || 'Camp not found.'} onRetry={loadCamp} />
       </div>
     )
   }

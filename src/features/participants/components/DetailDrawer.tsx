@@ -113,18 +113,20 @@ export function DetailDrawer({
 
   // ─── allocations ─────────────────────────────────────────────────────────────
   const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [allocError, setAllocError] = useState(false)
   const [voidTarget, setVoidTarget] = useState<Allocation | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
 
   const loadAllocations = useCallback(async () => {
     if (!campId || !participant) return
+    setAllocError(false)
     try {
       const allocs = await listAllocationsByParticipant(campId, participant.id)
       allocs.sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0))
       setAllocations(allocs)
     } catch {
-      // non-fatal; don't block the drawer
+      setAllocError(true)
     }
   }, [campId, participant])
 
@@ -567,7 +569,19 @@ export function DetailDrawer({
                 )}
 
                 {/* Allocations list */}
-                {allocations.length > 0 && (
+                {allocError && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Couldn't load payment history.{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => loadAllocations()}
+                    >
+                      Retry
+                    </button>
+                  </p>
+                )}
+                {!allocError && allocations.length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground">Allocations</p>
                     {allocations.map((a) => (

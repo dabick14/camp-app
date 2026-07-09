@@ -26,6 +26,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { PageError, PageLoading } from '@/components/ui/states'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { CsvImportModal } from '../components/CsvImportModal'
 import { RoomFormModal } from '../components/RoomFormModal'
@@ -59,20 +60,23 @@ export function RoomsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  async function loadData() {
     if (!campId) return
-    let cancelled = false
-    Promise.all([listRoomTypes(campId), listRooms(campId)])
-      .then(([types, roomsData]) => {
-        if (cancelled) return
-        setRoomTypes(types)
-        setRooms(roomsData)
-        setLoading(false)
-      })
-      .catch(() => {
-        if (!cancelled) { setError('Failed to load rooms.'); setLoading(false) }
-      })
-    return () => { cancelled = true }
+    setLoading(true)
+    setError('')
+    try {
+      const [types, roomsData] = await Promise.all([listRoomTypes(campId), listRooms(campId)])
+      setRoomTypes(types)
+      setRooms(roomsData)
+    } catch {
+      setError('Failed to load rooms.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
   }, [campId])
 
   async function refreshRooms() {
@@ -103,7 +107,7 @@ export function RoomsPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <PageLoading />
       </div>
     )
   }
@@ -111,7 +115,7 @@ export function RoomsPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <p className="text-sm text-destructive">{error}</p>
+        <PageError message={error} onRetry={loadData} />
       </div>
     )
   }

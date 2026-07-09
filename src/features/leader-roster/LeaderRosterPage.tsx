@@ -9,7 +9,9 @@ import {
 import { toast } from 'sonner'
 import { db, functions } from '@/lib/firebase'
 import { formatMoney } from '@/lib/formatMoney'
+import { withTimeout } from '@/lib/withTimeout'
 import { Input } from '@/components/ui/input'
+import { PageError, PageLoading } from '@/components/ui/states'
 import { LogoutButton } from '@/features/auth/LogoutButton'
 import { useUserRole } from '@/features/auth/UserRoleContext'
 import type { Participant } from '@/features/participants/types'
@@ -49,6 +51,7 @@ export function LeaderRosterPage() {
   const [camp, setCamp] = useState<Camp | null>(null)
   const [participants, setParticipants] = useState<RosterParticipant[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [toggling, setToggling] = useState<Set<string>>(new Set())
 
   const [searchRaw, setSearchRaw] = useState('')
@@ -65,52 +68,56 @@ export function LeaderRosterPage() {
   const subGroupId = role.type === 'leader' ? role.subGroupId : null
   const subGroupName = role.type === 'leader' ? role.subGroupName : ''
 
+  async function loadRoster(campId: string, subGroupId: string, cancelled: { value: boolean }) {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const [campData, snap] = await withTimeout(
+        Promise.all([
+          getCamp(campId),
+          getDocs(
+            query(
+              collection(db, 'camps', campId, 'participants'),
+              where('subGroupId', '==', subGroupId),
+            ),
+          ),
+        ]),
+      )
+      if (cancelled.value) return
+      setCamp(campData)
+      const list: RosterParticipant[] = snap.docs
+        .map((d) => {
+          const data = d.data() as Participant
+          return {
+            id: d.id,
+            fullName: data.fullName,
+            phone: data.phone,
+            feeOwed: data.feeOwed,
+            registrationState: data.registrationState,
+            paymentClaimed: data.paymentClaimed,
+            claimedBy: data.claimedBy,
+            confirmedBatchId: data.confirmedBatchId,
+          }
+        })
+        .filter((p) => p.registrationState === 'REGISTERED')
+        .sort((a, b) => a.fullName.localeCompare(b.fullName))
+      setParticipants(list)
+
+      const confirmedCount = list.filter((p) => !!p.confirmedBatchId).length
+      setConfirmedOpen(confirmedCount > 0 && confirmedCount <= CONFIRMED_AUTO_EXPAND_MAX)
+    } catch (err) {
+      if (cancelled.value) return
+      setLoadError((err as Error).message ?? 'Failed to load roster')
+    } finally {
+      if (!cancelled.value) setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!campId || !subGroupId) return
-    let cancelled = false
-
-    Promise.all([
-      getCamp(campId),
-      getDocs(
-        query(
-          collection(db, 'camps', campId, 'participants'),
-          where('subGroupId', '==', subGroupId),
-        ),
-      ),
-    ])
-      .then(([campData, snap]) => {
-        if (cancelled) return
-        setCamp(campData)
-        const list: RosterParticipant[] = snap.docs
-          .map((d) => {
-            const data = d.data() as Participant
-            return {
-              id: d.id,
-              fullName: data.fullName,
-              phone: data.phone,
-              feeOwed: data.feeOwed,
-              registrationState: data.registrationState,
-              paymentClaimed: data.paymentClaimed,
-              claimedBy: data.claimedBy,
-              confirmedBatchId: data.confirmedBatchId,
-            }
-          })
-          .filter((p) => p.registrationState === 'REGISTERED')
-          .sort((a, b) => a.fullName.localeCompare(b.fullName))
-        setParticipants(list)
-
-        // Auto-expand confirmed section if small enough to skim
-        const confirmedCount = list.filter((p) => !!p.confirmedBatchId).length
-        setConfirmedOpen(confirmedCount > 0 && confirmedCount <= CONFIRMED_AUTO_EXPAND_MAX)
-      })
-      .catch(() => {
-        if (!cancelled) toast.error('Failed to load roster')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => { cancelled = true }
+    const cancelled = { value: false }
+    loadRoster(campId, subGroupId, cancelled)
+    return () => { cancelled.value = true }
   }, [campId, subGroupId])
 
   async function handleToggle(p: RosterParticipant) {
@@ -234,17 +241,22 @@ export function LeaderRosterPage() {
         </Link>
       </div>
 
-      {loading && (
-        <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+      {loading && <PageLoading />}
+
+      {!loading && loadError && (
+        <PageError
+          message={loadError}
+          onRetry={() => campId && subGroupId && loadRoster(campId, subGroupId, { value: false })}
+        />
       )}
 
-      {!loading && participants.length === 0 && (
+      {!loading && !loadError && participants.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
           No registered participants in your group yet.
         </p>
       )}
 
-      {!loading && participants.length > 0 && (
+      {!loading && !loadError && participants.length > 0 && (
         <>
           {/* ── Sticky summary bar ───────────────────────────────────────────── */}
           <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm">

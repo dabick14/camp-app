@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PageError } from '@/components/ui/states'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { type Participant, type PaymentState, derivePaymentState } from './types'
 import { DetailDrawer } from './components/DetailDrawer'
@@ -175,7 +176,7 @@ function TagsCell({ tags }: { tags: string[] }) {
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function ParticipantListPage() {
-  const { camp, participants, subGroups, roomTypes, loading, refresh } = useCampData()
+  const { camp, participants, subGroups, roomTypes, loading, error, refresh } = useCampData()
   const currency = camp?.currency ?? 'GHS'
   const location = useLocation()
   const navigate = useNavigate()
@@ -349,6 +350,14 @@ export function ParticipantListPage() {
   }, [participants])
 
   // ─── render ─────────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="px-6 py-6">
+        <PageError message={error} onRetry={refresh} />
+      </div>
+    )
+  }
+
   return (
     <div className="px-6 py-6">
       {/* Action bar */}

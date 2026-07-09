@@ -20,6 +20,22 @@ export function ProtectedRoute({
     )
   }
 
+  if (role.type === 'error') {
+    return (
+      <div className="flex h-screen items-center justify-center px-4">
+        <div className="max-w-sm text-center">
+          <p className="text-sm text-destructive">{role.message}</p>
+          <button
+            className="mt-4 rounded-md border px-4 py-2 text-sm hover:bg-muted"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (role.type === 'none') {
     return <Navigate to="/login" replace />
   }

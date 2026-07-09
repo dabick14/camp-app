@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { PageError } from '@/components/ui/states'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { listLeaders } from './services/leaderService'
 import type { Leader } from './types'
@@ -36,6 +37,7 @@ export function LeadersPage() {
 
   const [leaders, setLeaders] = useState<Leader[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [showProvisionModal, setShowProvisionModal] = useState(false)
   const [confirmToggleUid, setConfirmToggleUid] = useState<string | null>(null)
   const [busyUid, setBusyUid] = useState<string | null>(null)
@@ -43,10 +45,16 @@ export function LeadersPage() {
   async function refetch() {
     if (!campId) return
     setLoading(true)
-    const data = await listLeaders(campId)
-    data.sort((a, b) => a.subGroupName.localeCompare(b.subGroupName))
-    setLeaders(data)
-    setLoading(false)
+    setLoadError('')
+    try {
+      const data = await listLeaders(campId)
+      data.sort((a, b) => a.subGroupName.localeCompare(b.subGroupName))
+      setLeaders(data)
+    } catch (err) {
+      setLoadError((err as Error).message ?? 'Failed to load leaders')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -106,6 +114,8 @@ export function LeadersPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : loadError ? (
+        <PageError message={loadError} onRetry={refetch} />
       ) : leaders.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-muted-foreground">No coordinators yet.</p>

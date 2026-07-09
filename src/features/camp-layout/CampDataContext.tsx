@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Camp, SubGroup } from '@/features/camps/types'
 import type { Room, RoomType } from '@/features/rooms/types'
 import type { Participant } from '@/features/participants/types'
+import { withTimeout } from '@/lib/withTimeout'
 import { getCamp } from '@/features/camps/services/campService'
 import { listSubGroups } from '@/features/camps/services/subGroupService'
 import { listRoomTypes } from '@/features/rooms/services/roomTypeService'
@@ -50,13 +51,13 @@ export function CampDataProvider({
     setLoading(true)
     setError('')
 
-    Promise.all([
+    withTimeout(Promise.all([
       getCamp(campId),
       listSubGroups(campId),
       listRoomTypes(campId),
       listRooms(campId),
       listParticipants(campId),
-    ])
+    ]))
       .then(([campData, sgs, rts, rms, parts]) => {
         if (gen !== genRef.current) return // superseded by a newer fetch
         setCamp(campData)
