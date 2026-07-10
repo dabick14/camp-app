@@ -12,7 +12,7 @@ import {
   type FieldValue,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Camp } from '../types'
+import type { Camp, SuperGroup } from '../types'
 
 type CampInput = Omit<Camp, 'id' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'>
 
@@ -61,6 +61,18 @@ export async function updateCamp(
 ): Promise<void> {
   await updateDoc(doc(db, 'camps', id), {
     ...undefinedToDelete(data as Record<string, unknown>),
+    updatedAt: Timestamp.now(),
+    updatedBy: uid,
+  })
+}
+
+export async function saveSuperGroups(
+  campId: string,
+  superGroups: SuperGroup[],
+  uid: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'camps', campId), {
+    superGroups,
     updatedAt: Timestamp.now(),
     updatedBy: uid,
   })

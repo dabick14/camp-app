@@ -4,18 +4,26 @@ import { Timestamp } from 'firebase/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   createSubGroup,
   listSubGroups,
   reorderSubGroups,
   updateSubGroup,
 } from '../services/subGroupService'
-import type { SubGroup } from '../types'
+import type { SubGroup, SuperGroup } from '../types'
 
 interface SubGroupsEditorProps {
   campId: string
+  campSuperGroups?: SuperGroup[]
 }
 
-export function SubGroupsEditor({ campId }: SubGroupsEditorProps) {
+export function SubGroupsEditor({ campId, campSuperGroups = [] }: SubGroupsEditorProps) {
   const [groups, setGroups] = useState<SubGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -89,6 +97,23 @@ export function SubGroupsEditor({ campId }: SubGroupsEditorProps) {
     }
   }
 
+  async function handleSuperGroupChange(subGroupId: string, superGroupId: string) {
+    setSaving(true)
+    try {
+      if (superGroupId === '') {
+        await updateSubGroup(campId, subGroupId, { superGroupId: null, superGroupName: null })
+        setGroups(groups.map((g) => g.id === subGroupId ? { ...g, superGroupId: undefined, superGroupName: undefined } : g))
+      } else {
+        const sg = campSuperGroups.find((s) => s.id === superGroupId)
+        if (!sg) return
+        await updateSubGroup(campId, subGroupId, { superGroupId: sg.id, superGroupName: sg.name })
+        setGroups(groups.map((g) => g.id === subGroupId ? { ...g, superGroupId: sg.id, superGroupName: sg.name } : g))
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   return (
@@ -98,80 +123,105 @@ export function SubGroupsEditor({ campId }: SubGroupsEditorProps) {
       )}
 
       <ul className="divide-y rounded-md border">
-        {groups.map((g, i) => (
-          <li key={g.id} className="flex items-center gap-2 px-3 py-2">
-            <span className="w-5 text-center text-xs text-muted-foreground">{i + 1}</span>
+        {groups.map((g, i) => {
+          // Treat a dangling superGroupId (super-group was removed) as unassigned
+          const pickerValue = g.superGroupId && campSuperGroups.some((s) => s.id === g.superGroupId)
+            ? g.superGroupId
+            : ''
 
-            {editingId === g.id ? (
-              <Input
-                ref={editInputRef}
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveEdit()
-                  if (e.key === 'Escape') cancelEdit()
-                }}
-                className="h-7 flex-1 text-sm"
-              />
-            ) : (
-              <span className="flex-1 text-sm">{g.name}</span>
-            )}
+          return (
+            <li key={g.id} className="flex items-center gap-2 px-3 py-2">
+              <span className="w-5 text-center text-xs text-muted-foreground">{i + 1}</span>
 
-            <div className="flex shrink-0 items-center gap-1">
               {editingId === g.id ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={saveEdit}
-                    disabled={saving}
-                    className="h-7 px-2 text-xs"
-                  >
-                    Save
-                  </Button>
+                <Input
+                  ref={editInputRef}
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveEdit()
+                    if (e.key === 'Escape') cancelEdit()
+                  }}
+                  className="h-7 flex-1 text-sm"
+                />
+              ) : (
+                <span className="flex-1 text-sm">{g.name}</span>
+              )}
+
+              {campSuperGroups.length > 0 && editingId !== g.id && (
+                <Select
+                  value={pickerValue}
+                  onValueChange={(val) => handleSuperGroupChange(g.id, val)}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="h-7 w-36 text-xs">
+                    <SelectValue placeholder="No super-group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {campSuperGroups.map((sg) => (
+                      <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <div className="flex shrink-0 items-center gap-1">
+                {editingId === g.id ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={saveEdit}
+                      disabled={saving}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={cancelEdit}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={cancelEdit}
-                    className="h-7 px-2 text-xs"
+                    onClick={() => startEdit(g)}
+                    className="h-7 w-7 p-0"
+                    aria-label="Edit name"
                   >
-                    Cancel
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                </>
-              ) : (
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => startEdit(g)}
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
                   className="h-7 w-7 p-0"
-                  aria-label="Edit name"
+                  aria-label="Move up"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  <ChevronUp className="h-4 w-4" />
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => move(i, -1)}
-                disabled={i === 0}
-                className="h-7 w-7 p-0"
-                aria-label="Move up"
-              >
-                <ChevronUp className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => move(i, 1)}
-                disabled={i === groups.length - 1}
-                className="h-7 w-7 p-0"
-                aria-label="Move down"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </li>
-        ))}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => move(i, 1)}
+                  disabled={i === groups.length - 1}
+                  className="h-7 w-7 p-0"
+                  aria-label="Move down"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </div>
+            </li>
+          )
+        })}
       </ul>
 
       <div className="flex gap-2">

@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { SubGroup } from '../types'
@@ -35,12 +36,24 @@ export async function createSubGroup(
 export async function updateSubGroup(
   campId: string,
   id: string,
-  data: { name?: string; order?: number },
+  data: {
+    name?: string
+    order?: number
+    superGroupId?: string | null   // null = clear the assignment
+    superGroupName?: string | null
+  },
 ): Promise<void> {
-  await updateDoc(doc(db, 'camps', campId, 'subGroups', id), {
-    ...data,
-    updatedAt: Timestamp.now(),
-  })
+  const patch: Record<string, unknown> = { updatedAt: Timestamp.now() }
+  if (data.name !== undefined) patch.name = data.name
+  if (data.order !== undefined) patch.order = data.order
+  if (data.superGroupId === null) {
+    patch.superGroupId = deleteField()
+    patch.superGroupName = deleteField()
+  } else if (data.superGroupId !== undefined) {
+    patch.superGroupId = data.superGroupId
+    patch.superGroupName = data.superGroupName ?? null
+  }
+  await updateDoc(doc(db, 'camps', campId, 'subGroups', id), patch)
 }
 
 // Writes order: 0, 1, 2 ... for each ID in the given array.
