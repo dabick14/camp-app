@@ -123,6 +123,50 @@ No tiered roles. No attendee self-service. No leader portal.
 - If GitHub (or any scanner) flags a committed secret: rotating/revoking the credential in its origin console is the actual fix, not just removing it from the current file — the old value still lives in git history once pushed.
 - True secrets (third-party API keys with real access, service account keys) get the same env-var treatment at minimum; for anything Cloud Functions need at runtime, prefer `firebase-functions/params`'s `defineSecret` (Secret Manager) over a plain `.env` value.
 
+## Git workflow (GitHub Flow)
+
+### Branch check — do this at the start of every session
+Run `git branch` and `git status`. Then decide:
+
+| Situation | Action |
+|---|---|
+| On `main`, clean | Create a feature branch before touching any code |
+| On a feature branch, prompt is for the **same** feature | Continue on the current branch |
+| On a feature branch, prompt is for a **different** feature or concern | Stash or commit WIP, then `git checkout main && git checkout -b <new-branch>` |
+| On `main` with uncommitted changes | Stop — commit or stash before doing anything else |
+
+**"Radically differs" means:** different feature area, different data model concern, or different bug — not just a different file. Renaming strings and fixing a payment bug are different concerns; they go on different branches.
+
+### Branch naming
+```
+feature/<short-noun-phrase>   # new capability
+fix/<short-noun-phrase>       # bug fix
+chore/<short-noun-phrase>     # tooling, config, refactor with no user-visible change
+```
+Examples: `feature/room-type-csv-import`, `fix/batch-reconcile-variance`, `chore/remove-dead-leader-portal-code`
+
+Keep names lowercase, hyphen-separated, no ticket numbers.
+
+### Rules
+- `main` is always deployable. Never commit broken code directly to `main`.
+- All changes to `main` go through a PR — no direct pushes.
+- One concern per branch. If a branch grows to cover two unrelated things, split it before opening the PR.
+- Branches are short-lived (days, not weeks). If a branch is open for more than a week, it's drifting — merge or close it.
+- Delete the branch after it's merged.
+
+### Commit messages
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+```
+<type>(<scope>): <short imperative description>
+```
+Types: `feat`, `fix`, `chore`, `refactor`, `test`, `docs`  
+Scope: the feature folder or file area (e.g. `auth`, `payments`, `rooms`, `dashboard`)
+
+Examples:
+- `feat(payments): add reconcile-with-variance path`
+- `fix(auth): cast leaderSnap.data() to any to satisfy tsc -b`
+- `chore: rename user-facing leader → coordinator`
+
 ## When in doubt
 - Cut features rather than add them.
 - Choose boring over clever.

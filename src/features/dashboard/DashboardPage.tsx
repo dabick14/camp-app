@@ -32,6 +32,7 @@ export function DashboardPage() {
   // By sub-group is the default tab — it's always computed.
   const [seenRoomType, setSeenRoomType] = useState(false)
   const [seenGender, setSeenGender] = useState(false)
+  const [seenSuperGroup, setSeenSuperGroup] = useState(false)
 
   const active = useMemo(
     () => participants.filter((p) => p.registrationState === 'REGISTERED'),
@@ -81,6 +82,53 @@ export function DashboardPage() {
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [active, subGroups])
 
+  // ─── By super-group (lazy — only computed after first visit to that tab) ────
+  const bySuperGroup = useMemo(() => {
+    if (!seenSuperGroup) return null
+    const campSuperGroups = camp?.superGroups ?? []
+    const knownIds = new Set(campSuperGroups.map((sg) => sg.id))
+
+    type Bucket = {
+      name: string; registered: number; paid: number; partial: number
+      pending: number; waived: number; roomed: number; totalExpected: number; totalReceived: number
+    }
+    const zero = (): Bucket => ({
+      name: '', registered: 0, paid: 0, partial: 0,
+      pending: 0, waived: 0, roomed: 0, totalExpected: 0, totalReceived: 0,
+    })
+
+    const buckets = new Map<string, Bucket>()
+    for (const sg of campSuperGroups) {
+      buckets.set(sg.id, { ...zero(), name: sg.name })
+    }
+    const unassigned: Bucket = { ...zero(), name: 'Unassigned' }
+
+    // Build sub-group → super-group lookup; dangling references count as unassigned
+    const sgToSuper = new Map<string, string | null>()
+    for (const sg of subGroups) {
+      sgToSuper.set(sg.id, sg.superGroupId && knownIds.has(sg.superGroupId) ? sg.superGroupId : null)
+    }
+
+    for (const p of active) {
+      const superId = sgToSuper.get(p.subGroupId) ?? null
+      const bucket = superId ? buckets.get(superId) ?? unassigned : unassigned
+      bucket.registered++
+      const ps = derivePaymentState(p)
+      if (ps === 'PAID') bucket.paid++
+      else if (ps === 'PARTIAL') bucket.partial++
+      else if (ps === 'PENDING') bucket.pending++
+      else if (ps === 'WAIVED') bucket.waived++
+      if (p.roomId) bucket.roomed++
+      bucket.totalExpected += p.feeOwed
+      bucket.totalReceived += p.amountPaid
+    }
+
+    const rows: Bucket[] = campSuperGroups.map((sg) => buckets.get(sg.id)!)
+    if (unassigned.registered > 0 || campSuperGroups.length === 0) rows.push(unassigned)
+
+    return { rows, hasSuperGroups: campSuperGroups.length > 0 }
+  }, [seenSuperGroup, active, subGroups, camp])
+
   // ─── By room type (lazy — only computed after first visit to that tab) ──────
   const byRoomType = useMemo(() => {
     if (!seenRoomType) return null
@@ -118,6 +166,7 @@ export function DashboardPage() {
   }, [seenGender, active, rooms])
 
   function handleTabChange(value: string) {
+    if (value === 'by-super') setSeenSuperGroup(true)
     if (value === 'by-rt') setSeenRoomType(true)
     if (value === 'by-gender') setSeenGender(true)
   }
@@ -151,6 +200,7 @@ export function DashboardPage() {
       <Tabs defaultValue="by-sg" onValueChange={handleTabChange}>
         <TabsList className="mb-4 w-full justify-start sm:w-auto">
           <TabsTrigger value="by-sg">By sub-group</TabsTrigger>
+          <TabsTrigger value="by-super">By super-group</TabsTrigger>
           <TabsTrigger value="by-rt">By room type</TabsTrigger>
           <TabsTrigger value="by-gender">By gender</TabsTrigger>
         </TabsList>
@@ -201,6 +251,52 @@ export function DashboardPage() {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        {/* ── By super-group ─────────────────────────────────────────────────── */}
+        <TabsContent value="by-super">
+          {bySuperGroup === null ? null : !bySuperGroup.hasSuperGroups ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No super-groups defined for this camp. Add them in Camp Settings to see rollup counts here.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Super-group</TableHead>
+                    <TableHead className="text-right">Registered</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Partial</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
+                    <TableHead className="text-right">Waived</TableHead>
+                    <TableHead className="text-right">Roomed</TableHead>
+                    <TableHead className="text-right">Expected ({currency})</TableHead>
+                    <TableHead className="text-right">Received ({currency})</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bySuperGroup.rows.map((row) => (
+                    <TableRow key={row.name} className={row.name === 'Unassigned' ? 'text-muted-foreground' : ''}>
+                      <TableCell className="font-medium">{row.name}</TableCell>
+                      <TableCell className="text-right">{row.registered}</TableCell>
+                      <TableCell className="text-right text-emerald-600">{row.paid}</TableCell>
+                      <TableCell className="text-right text-amber-600">{row.partial}</TableCell>
+                      <TableCell className="text-right text-red-600">{row.pending}</TableCell>
+                      <TableCell className="text-right">{row.waived}</TableCell>
+                      <TableCell className="text-right">{row.roomed}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(row.totalExpected, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(row.totalReceived, currency)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── By room type ───────────────────────────────────────────────────── */}

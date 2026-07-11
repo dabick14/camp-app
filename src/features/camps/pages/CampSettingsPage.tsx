@@ -2,22 +2,33 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { PageError, PageLoading } from '@/components/ui/states'
-import { Separator } from '@/components/ui/separator'
 import { auth } from '@/lib/firebase'
 import { dateStrToTs, tsToDateStr } from '@/lib/dates'
 import { RoomTypesEditor } from '@/features/rooms/components/RoomTypesEditor'
 import { CampForm } from '../components/CampForm'
 import { SubGroupsEditor } from '../components/SubGroupsEditor'
+import { SuperGroupsEditor } from '../components/SuperGroupsEditor'
 import { getCamp, updateCamp } from '../services/campService'
-import type { Camp, CampFormValues } from '../types'
+import type { Camp, CampFormValues, SuperGroup } from '../types'
+
+const SECTIONS = [
+  { id: 'general',       label: 'General' },
+  { id: 'super-groups',  label: 'Super-groups' },
+  { id: 'sub-groups',    label: 'Sub-groups' },
+  { id: 'room-types',    label: 'Room types' },
+] as const
+
+type SectionId = typeof SECTIONS[number]['id']
 
 export function CampSettingsPage() {
   const { id } = useParams<{ id: string }>()
   const [camp, setCamp] = useState<Camp | null>(null)
+  const [superGroups, setSuperGroups] = useState<SuperGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [section, setSection] = useState<SectionId>('general')
 
   const loadCamp = useCallback(async () => {
     if (!id) return
@@ -26,7 +37,10 @@ export function CampSettingsPage() {
     try {
       const data = await getCamp(id)
       if (!data) setError('Camp not found.')
-      else setCamp(data)
+      else {
+        setCamp(data)
+        setSuperGroups(data.superGroups ?? [])
+      }
     } catch {
       setError('Failed to load camp.')
     } finally {
@@ -57,8 +71,7 @@ export function CampSettingsPage() {
         },
         uid,
       )
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      toast.success('Changes saved.')
     } catch (err) {
       toast.error((err as Error).message ?? 'Failed to save changes')
     }
@@ -66,7 +79,7 @@ export function CampSettingsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-8">
+      <div className="mx-auto max-w-3xl px-6 py-8">
         <PageLoading />
       </div>
     )
@@ -74,7 +87,7 @@ export function CampSettingsPage() {
 
   if (error || !camp) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-8">
+      <div className="mx-auto max-w-3xl px-6 py-8">
         <PageError message={error || 'Camp not found.'} onRetry={loadCamp} />
       </div>
     )
@@ -95,7 +108,7 @@ export function CampSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
+    <div className="mx-auto max-w-3xl px-6 py-8">
       <Link
         to={`/admin/camps/${id}`}
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -106,28 +119,64 @@ export function CampSettingsPage() {
 
       <h1 className="mb-6 text-2xl font-semibold">Camp settings</h1>
 
-      <CampForm defaultValues={defaultValues} onSubmit={handleSubmit} submitLabel="Save changes" />
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
 
-      {saved && <p className="mt-3 text-sm text-emerald-600">Changes saved.</p>}
+        {/* ── Desktop sidebar ── */}
+        <nav className="hidden md:block w-40 shrink-0">
+          <ul className="space-y-0.5">
+            {SECTIONS.map((s) => (
+              <li key={s.id}>
+                <button
+                  onClick={() => setSection(s.id)}
+                  className={cn(
+                    'w-full rounded-md px-3 py-2 text-left text-sm transition-colors',
+                    section === s.id
+                      ? 'bg-muted font-medium text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  {s.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      <Separator className="my-8" />
+        <div className="flex-1 min-w-0">
+          {/* ── Mobile scrollable tab bar ── */}
+          <div className="mb-6 overflow-x-auto md:hidden">
+            <div className="flex w-max min-w-full gap-1 rounded-lg bg-muted p-1">
+              {SECTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSection(s.id)}
+                  className={cn(
+                    'whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors',
+                    section === s.id
+                      ? 'bg-background font-medium text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div>
-        <h2 className="mb-4 text-lg font-medium">Sub-groups</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Registrants pick exactly one sub-group. To remove a sub-group, rename it.
-        </p>
-        <SubGroupsEditor campId={id!} />
-      </div>
-
-      <Separator className="my-8" />
-
-      <div>
-        <h2 className="mb-4 text-lg font-medium">Room types</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Define types before adding rooms. Capacity here is the default; individual rooms can override it.
-        </p>
-        <RoomTypesEditor campId={id!} currency={camp.currency ?? 'GHS'} />
+          {/* ── Section content ── */}
+          {section === 'general' && (
+            <CampForm defaultValues={defaultValues} onSubmit={handleSubmit} submitLabel="Save changes" />
+          )}
+          {section === 'super-groups' && (
+            <SuperGroupsEditor campId={id!} superGroups={superGroups} onChange={setSuperGroups} />
+          )}
+          {section === 'sub-groups' && (
+            <SubGroupsEditor campId={id!} campSuperGroups={superGroups} />
+          )}
+          {section === 'room-types' && (
+            <RoomTypesEditor campId={id!} currency={camp.currency ?? 'GHS'} />
+          )}
+        </div>
       </div>
     </div>
   )
