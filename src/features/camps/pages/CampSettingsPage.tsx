@@ -79,7 +79,7 @@ export function CampSettingsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-8">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <PageLoading />
       </div>
     )
@@ -87,7 +87,7 @@ export function CampSettingsPage() {
 
   if (error || !camp) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-8">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <PageError message={error || 'Camp not found.'} onRetry={loadCamp} />
       </div>
     )
@@ -108,7 +108,7 @@ export function CampSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <Link
         to={`/admin/camps/${id}`}
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

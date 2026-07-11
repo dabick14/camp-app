@@ -361,10 +361,10 @@ export function ParticipantListPage() {
   return (
     <div className="px-6 py-6">
       {/* Action bar */}
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-2 gap-y-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {/* Search */}
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchRaw}
@@ -473,7 +473,7 @@ export function ParticipantListPage() {
         </div>
 
         {/* Add participant button */}
-        <Button size="sm" onClick={() => navigate('participants/new')}>
+        <Button size="sm" className="shrink-0" onClick={() => navigate('participants/new')}>
           <Plus className="h-4 w-4" />
           Add participant
         </Button>

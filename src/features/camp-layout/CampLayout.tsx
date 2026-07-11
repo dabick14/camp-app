@@ -11,7 +11,7 @@ import { CampDataProvider, useCampData } from './CampDataContext'
 function MetricCard({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   const alert = warn && value > 0
   return (
-    <div className="flex min-w-[72px] flex-col px-4 py-2">
+    <div className="flex min-w-[80px] flex-col px-4 py-2">
       <div className="flex items-center gap-1">
         {alert && <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />}
         <span className={`text-2xl font-semibold tabular-nums leading-none ${alert ? 'text-red-700' : ''}`}>{value}</span>
@@ -77,30 +77,79 @@ function CampLayoutInner() {
           </div>
         </div>
 
-        {/* Metric strip */}
-        <div className="mt-4 flex items-center gap-0 overflow-x-auto">
-          <MetricCard label="Registered" value={metrics.registered} />
-          <Separator orientation="vertical" className="h-10" />
-          <MetricCard label="Paid" value={metrics.paid} />
-          <Separator orientation="vertical" className="h-10" />
-          <MetricCard label="Partial" value={metrics.partial} />
-          <Separator orientation="vertical" className="h-10" />
-          <MetricCard label="Pending" value={metrics.pending} />
-          <Separator orientation="vertical" className="h-10" />
-          <MetricCard label="Roomed" value={metrics.roomed} />
-          <Separator orientation="vertical" className="h-10" />
-          <MetricCard label="Overrides" value={metrics.overrides} warn />
-          <Separator orientation="vertical" className="h-10" />
-          <Link
-            to={`${base}/dashboard`}
-            className="ml-3 whitespace-nowrap text-sm text-primary hover:underline"
-          >
-            View full dashboard →
-          </Link>
-        </div>
+        {/* Metric strip — mobile: 3×2 grid; desktop: horizontal flex */}
+        {(() => {
+          const metricItems = [
+            { label: 'Registered', value: metrics.registered },
+            { label: 'Paid',       value: metrics.paid },
+            { label: 'Partial',    value: metrics.partial },
+            { label: 'Pending',    value: metrics.pending },
+            { label: 'Roomed',     value: metrics.roomed },
+            { label: 'Overrides',  value: metrics.overrides, warn: true },
+          ]
+          return (
+            <>
+              {/* Mobile 3×2 grid */}
+              <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg border sm:hidden">
+                {metricItems.map((m, i) => {
+                  const alert = m.warn && m.value > 0
+                  return (
+                    <div
+                      key={m.label}
+                      className={[
+                        'flex flex-col items-center py-3',
+                        i % 3 !== 2 ? 'border-r' : '',
+                        i >= 3 ? 'border-t' : '',
+                        alert ? 'bg-red-50 dark:bg-red-950/20' : '',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-center gap-0.5">
+                        {alert && <AlertTriangle className="h-3 w-3 shrink-0 text-red-600" />}
+                        <span className={`text-xl font-semibold tabular-nums leading-none ${alert ? 'text-red-700' : ''}`}>
+                          {m.value}
+                        </span>
+                      </div>
+                      <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {m.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <Link
+                to={`${base}/dashboard`}
+                className="mt-1.5 inline-block text-sm text-primary hover:underline sm:hidden"
+              >
+                View full dashboard →
+              </Link>
 
-        {/* Sub-nav tabs */}
-        <nav className="-mb-px mt-4 flex overflow-x-auto">
+              {/* Desktop horizontal strip */}
+              <div className="mt-4 hidden items-center overflow-x-auto sm:flex">
+                <MetricCard label="Registered" value={metrics.registered} />
+                <Separator orientation="vertical" className="h-10" />
+                <MetricCard label="Paid" value={metrics.paid} />
+                <Separator orientation="vertical" className="h-10" />
+                <MetricCard label="Partial" value={metrics.partial} />
+                <Separator orientation="vertical" className="h-10" />
+                <MetricCard label="Pending" value={metrics.pending} />
+                <Separator orientation="vertical" className="h-10" />
+                <MetricCard label="Roomed" value={metrics.roomed} />
+                <Separator orientation="vertical" className="h-10" />
+                <MetricCard label="Overrides" value={metrics.overrides} warn />
+                <Separator orientation="vertical" className="h-10" />
+                <Link
+                  to={`${base}/dashboard`}
+                  className="ml-3 whitespace-nowrap text-sm text-primary hover:underline"
+                >
+                  View full dashboard →
+                </Link>
+              </div>
+            </>
+          )
+        })()}
+
+        {/* Sub-nav tabs — shrink-0 on each item ensures overflow-x-auto scrolls correctly */}
+        <nav className="-mb-px mt-4 flex w-full overflow-x-auto">
           {[
             { to: base, end: true, label: 'Participants', icon: Users },
             { to: `${base}/dashboard`, end: false, label: 'Dashboard', icon: LayoutGrid },
@@ -114,7 +163,7 @@ function CampLayoutInner() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                `flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
                   isActive
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
