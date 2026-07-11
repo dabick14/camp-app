@@ -140,13 +140,14 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
         <Field label="Currency" error={errors.currency?.message}>
           <Input {...register('currency')} placeholder="GHS" />
         </Field>
-        <Field label="Image URL" error={errors.imageUrl?.message}>
-          <Input {...register('imageUrl')} placeholder="https://…" />
-        </Field>
       </div>
 
       <Field label="Description" error={errors.description?.message}>
         <Textarea {...register('description')} rows={3} placeholder="Optional description" />
+      </Field>
+
+      <Field label="Image URL" error={errors.imageUrl?.message}>
+        <Input {...register('imageUrl')} placeholder="https://…" />
       </Field>
 
       {/* Registration open — blast-radius control */}

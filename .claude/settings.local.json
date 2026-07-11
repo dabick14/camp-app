@@ -30,7 +30,10 @@
       "Bash(find /Users/daviddagvanderpuije/dev/flstuff/camp-app -iname \"*designer-skill*\" -o -iname \"*design-skill*\" 2>/dev/null; find ~/.claude/skills -iname \"*design*\" 2>/dev/null; ls /Users/daviddagvanderpuije/dev/flstuff/camp-app/.claude/skills 2>/dev/null)",
       "Read(//Users/daviddagvanderpuije/.claude/**)",
       "Skill(run)",
-      "Skill(run:*)"
+      "Skill(run:*)",
+      "Bash(git checkout *)",
+      "Bash(firebase emulators:start --only firestore,auth --project demo-camp-app-rules-test-2)",
+      "Bash(FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npx vitest run)"
     ],
     "additionalDirectories": [
       "/Users/daviddagvanderpuije/dev/flstuff/camp-app",
