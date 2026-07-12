@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Plus, RefreshCw } from 'lucide-react'
+import { PageTitle } from '@/components/ui/page-title'
 import { PageError } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Separator } from '@/components/ui/separator'
+import { SubGroupSelect } from '@/features/camps/components/SubGroupSelect'
+import type { SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
@@ -31,13 +35,14 @@ export function PaymentsPage() {
   const { id: campId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { camp, subGroups, participants } = useCampData()
+  const superGroups: SuperGroup[] = camp?.superGroups ?? []
   const currency = camp?.currency ?? 'GHS'
 
   const [batches, setBatches] = useState<PaymentBatch[]>([])
   const [batchesLoading, setBatchesLoading] = useState(true)
   const [batchesError, setBatchesError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [sgFilter, setSgFilter] = useState<string>('all')
+  const [sgFilter, setSgFilter] = useState<string>('')
 
   const loadBatches = useCallback(async () => {
     if (!campId) return
@@ -98,15 +103,15 @@ export function PaymentsPage() {
 
   // ── Part B: filtered batch list ───────────────────────────────────────────
   const filteredBatches = useMemo(() => {
-    if (sgFilter === 'all') return batches
+    if (!sgFilter) return batches
     return batches.filter((b) => b.subGroupId === sgFilter)
   }, [batches, sgFilter])
 
   return (
-    <div className="px-6 py-6">
+    <PageContainer>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Payments</h2>
+        <PageTitle>Payments</PageTitle>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -156,9 +161,9 @@ export function PaymentsPage() {
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
                     <TableCell className="text-right">{row.registered}</TableCell>
-                    <TableCell className="text-right text-emerald-600">{row.paid}</TableCell>
-                    <TableCell className="text-right text-amber-600">{row.partial}</TableCell>
-                    <TableCell className="text-right text-red-600">{row.pending}</TableCell>
+                    <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
+                    <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
+                    <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMoney(row.totalExpected, currency)}
                     </TableCell>
@@ -204,16 +209,14 @@ export function PaymentsPage() {
             Batches
           </h3>
           {/* Sub-group filter */}
-          <select
-            className="rounded-md border bg-background px-3 py-1.5 text-sm"
+          <SubGroupSelect
+            subGroups={subGroups}
+            superGroups={superGroups}
             value={sgFilter}
-            onChange={(e) => setSgFilter(e.target.value)}
-          >
-            <option value="all">All sub-groups</option>
-            {subGroups.map((sg) => (
-              <option key={sg.id} value={sg.id}>{sg.name}</option>
-            ))}
-          </select>
+            onChange={setSgFilter}
+            noneLabel="All sub-groups"
+            className="w-48"
+          />
         </div>
 
         {batchesLoading ? (
@@ -282,6 +285,6 @@ export function PaymentsPage() {
           onSaved={loadBatches}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

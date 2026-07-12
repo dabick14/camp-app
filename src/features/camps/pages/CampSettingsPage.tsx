@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
+import { useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { PageError, PageLoading } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import { auth } from '@/lib/firebase'
 import { dateStrToTs, tsToDateStr } from '@/lib/dates'
 import { RoomTypesEditor } from '@/features/rooms/components/RoomTypesEditor'
@@ -12,6 +12,7 @@ import { SubGroupsEditor } from '../components/SubGroupsEditor'
 import { SuperGroupsEditor } from '../components/SuperGroupsEditor'
 import { getCamp, updateCamp } from '../services/campService'
 import type { Camp, CampFormValues, SuperGroup } from '../types'
+import { PageTitle } from '@/components/ui/page-title'
 
 const SECTIONS = [
   { id: 'general',       label: 'General' },
@@ -79,17 +80,17 @@ export function CampSettingsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <PageContainer>
         <PageLoading />
-      </div>
+      </PageContainer>
     )
   }
 
   if (error || !camp) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <PageContainer>
         <PageError message={error || 'Camp not found.'} onRetry={loadCamp} />
-      </div>
+      </PageContainer>
     )
   }
 
@@ -108,16 +109,8 @@ export function CampSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <Link
-        to={`/admin/camps/${id}`}
-        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        {camp.name}
-      </Link>
-
-      <h1 className="mb-6 text-2xl font-semibold">Camp settings</h1>
+    <PageContainer>
+      <PageTitle className="mb-6">Camp settings</PageTitle>
 
       <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
 
@@ -131,7 +124,7 @@ export function CampSettingsPage() {
                   className={cn(
                     'w-full rounded-md px-3 py-2 text-left text-sm transition-colors',
                     section === s.id
-                      ? 'bg-muted font-medium text-foreground'
+                      ? 'bg-brand-tint font-medium text-primary'
                       : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                   )}
                 >
@@ -178,6 +171,6 @@ export function CampSettingsPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

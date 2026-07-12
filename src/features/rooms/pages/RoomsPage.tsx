@@ -27,12 +27,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { PageError, PageLoading } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { CsvImportModal } from '../components/CsvImportModal'
 import { RoomFormModal } from '../components/RoomFormModal'
 import { deleteRoom, listRooms } from '../services/roomService'
 import { listRoomTypes } from '../services/roomTypeService'
 import type { Room, RoomType } from '../types'
+import { PageTitle } from '@/components/ui/page-title'
 
 function naturalSort(rooms: Room[]): Room[] {
   return [...rooms].sort((a, b) =>
@@ -106,24 +108,24 @@ export function RoomsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <PageContainer>
         <PageLoading />
-      </div>
+      </PageContainer>
     )
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <PageContainer>
         <PageError message={error} onRetry={loadData} />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-6">
+    <PageContainer>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Rooms</h1>
+        <PageTitle>Rooms</PageTitle>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setImportModalOpen(true)}>
             <UploadIcon className="mr-2 h-4 w-4" />
@@ -317,6 +319,6 @@ export function RoomsPage() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
+    </PageContainer>
   )
 }

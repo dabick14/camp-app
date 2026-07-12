@@ -19,6 +19,11 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        /* Payment status variants */
+        paid:    "bg-[var(--status-paid-bg)]    text-[var(--status-paid)]    border-transparent",
+        partial: "bg-[var(--status-partial-bg)] text-[var(--status-partial)] border-transparent",
+        pending: "bg-[var(--status-pending-bg)] text-[var(--status-pending)] border-transparent",
+        waived:  "bg-[var(--status-waived-bg)]  text-[var(--status-waived)]  border-transparent",
       },
     },
     defaultVariants: {

@@ -213,7 +213,7 @@ export function LeaderRosterPage() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{camp?.name ?? '…'}</h1>
+          <h1 className="font-display text-2xl font-semibold">{camp?.name ?? '…'}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{subGroupName}</p>
         </div>
         <LogoutButton />
@@ -228,7 +228,7 @@ export function LeaderRosterPage() {
           <UserPlus className="h-4 w-4" />
           Register
         </Link>
-        <span className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-3.5 text-sm font-medium">
+        <span className="flex items-center gap-1.5 rounded-md bg-brand-tint px-3 py-3.5 text-sm font-medium text-primary">
           <ClipboardList className="h-4 w-4" />
           Payment roster
         </span>
@@ -263,12 +263,12 @@ export function LeaderRosterPage() {
             <div className="flex items-center justify-between gap-3 text-sm">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span>
-                  <span className="font-semibold text-emerald-600">{claimedUnconfirmed.length}</span>
+                  <span className="font-semibold text-status-paid">{claimedUnconfirmed.length}</span>
                   <span className="ml-1 text-muted-foreground">marked</span>
                 </span>
                 {confirmed.length > 0 && (
                   <span>
-                    <span className="font-semibold text-emerald-700">{confirmed.length}</span>
+                    <span className="font-semibold text-status-paid">{confirmed.length}</span>
                     <span className="ml-1 text-muted-foreground">confirmed</span>
                   </span>
                 )}
@@ -325,7 +325,7 @@ export function LeaderRosterPage() {
                     onClick={() => setStateFilter(f)}
                     className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                       stateFilter === f
-                        ? 'bg-foreground text-background'
+                        ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground hover:bg-muted/70'
                     }`}
                   >
@@ -366,7 +366,7 @@ export function LeaderRosterPage() {
                         onClick={() => !isBusy && handleToggle(p)}
                         disabled={isBusy}
                         className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 ${
-                          isClaimed ? 'bg-emerald-50/60' : ''
+                          isClaimed ? 'bg-status-paid-bg/60' : ''
                         }`}
                       >
                         {isClaimed ? (
@@ -377,7 +377,7 @@ export function LeaderRosterPage() {
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium leading-snug">{p.fullName}</span>
                           {isClaimed && (
-                            <span className="mt-0.5 inline-flex items-center rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+                            <span className="mt-0.5 inline-flex items-center rounded bg-status-paid-bg px-1.5 py-0.5 text-xs font-medium text-status-paid">
                               Claimed
                             </span>
                           )}
@@ -433,12 +433,12 @@ export function LeaderRosterPage() {
                         onClick={() =>
                           toast.info("Confirmed payments can't be changed — contact the admin.")
                         }
-                        className="flex w-full items-center gap-3 bg-emerald-50/60 px-4 py-3 text-left"
+                        className="flex w-full items-center gap-3 bg-status-paid-bg/60 px-4 py-3 text-left"
                       >
                         <Lock className="h-5 w-5 shrink-0 text-emerald-600" />
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium leading-snug">{p.fullName}</span>
-                          <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+                          <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-status-paid-bg px-1.5 py-0.5 text-xs font-medium text-status-paid">
                             <Lock className="h-3 w-3" />
                             Confirmed
                           </span>

@@ -15,10 +15,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { PageError } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { listLeaders } from './services/leaderService'
 import type { Leader } from './types'
 import { ProvisionLeaderModal } from './components/ProvisionLeaderModal'
+import { PageTitle } from '@/components/ui/page-title'
 
 const SET_LEADER_ACTIVE_URL =
   'https://us-central1-camp-app-119bb.cloudfunctions.net/setLeaderActive'
@@ -103,9 +105,9 @@ export function LeadersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
+    <PageContainer>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Coordinators</h1>
+        <PageTitle>Coordinators</PageTitle>
         <Button onClick={() => setShowProvisionModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add coordinator
@@ -142,9 +144,11 @@ export function LeadersPage() {
                 <TableCell className="text-muted-foreground">{leader.email}</TableCell>
                 <TableCell>{leader.subGroupName}</TableCell>
                 <TableCell>
-                  <Badge variant={leader.active ? 'default' : 'secondary'}>
-                    {leader.active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  {leader.active ? (
+                    <Badge className="border-transparent bg-status-paid-bg text-status-paid">Active</Badge>
+                  ) : (
+                    <Badge variant="secondary">Inactive</Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{fmtLastLogin(leader.lastLoginAt)}</TableCell>
                 <TableCell className="text-right">
@@ -196,6 +200,6 @@ export function LeadersPage() {
           onClose={() => setShowProvisionModal(false)}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }
