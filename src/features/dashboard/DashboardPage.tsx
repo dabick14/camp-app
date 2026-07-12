@@ -1,25 +1,38 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageTitle } from '@/components/ui/page-title'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageError, PageLoading } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
 
-function BigMetric({ label, value, sub, warn }: { label: string; value: number; sub?: string; warn?: boolean }) {
+function BigMetric({ label, value, sub, warn, accent }: { label: string; value: number; sub?: string; warn?: boolean; accent?: boolean }) {
   const alert = warn && value > 0
   return (
-    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200' : 'bg-card text-card-foreground'}`}>
+    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-destructive/20 bg-destructive/5 text-foreground' : 'bg-card text-card-foreground'}`}>
       <div className="flex items-center gap-1.5">
-        {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />}
-        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-red-700 dark:text-red-400' : ''}`}>{value.toLocaleString()}</p>
+        {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />}
+        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-destructive' : accent ? 'text-primary' : ''}`}>{value.toLocaleString()}</p>
       </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  )
+}
+
+function MoneyMetric({ label, amount, currency, accent }: { label: string; amount: number; currency: string; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border bg-card px-5 py-4">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold tabular-nums ${accent ? 'text-status-paid' : ''}`}>
+        {currency} {amount.toLocaleString()}
+      </p>
     </div>
   )
 }
@@ -42,6 +55,7 @@ export function DashboardPage() {
   // ─── top-level metrics (always needed — power the summary cards) ────────────
   const metrics = useMemo(() => {
     let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0, overrides = 0
+    let totalMoneyPaid = 0, totalFeeOwed = 0
     for (const p of active) {
       const ps = derivePaymentState(p)
       if (ps === 'PAID') paid++
@@ -50,8 +64,11 @@ export function DashboardPage() {
       else if (ps === 'WAIVED') waived++
       if (p.roomId) roomed++
       if (p.roomedWithoutFullPayment) overrides++
+      totalMoneyPaid += p.amountPaid
+      totalFeeOwed += p.feeOwed
     }
-    return { registered: active.length, paid, partial, pending, waived, roomed, overrides }
+    const totalMoneyOwed = Math.max(0, totalFeeOwed - totalMoneyPaid)
+    return { registered: active.length, paid, partial, pending, waived, roomed, overrides, totalMoneyPaid, totalMoneyOwed }
   }, [active])
 
   // ─── By sub-group (default tab — computed immediately) ─────────────────────
@@ -172,10 +189,10 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="px-6 py-6">
+    <PageContainer>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Dashboard</h2>
+        <PageTitle>Dashboard</PageTitle>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -186,9 +203,9 @@ export function DashboardPage() {
       {!loading && error && <PageError message={error} onRetry={refresh} />}
       {loading || error ? null : <>
 
-      {/* Summary cards — always above the tabs */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <BigMetric label="Registered" value={metrics.registered} />
+      {/* Summary cards — people counts */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <BigMetric label="Registered" value={metrics.registered} accent />
         <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} />
         <BigMetric label="Partial" value={metrics.partial} />
         <BigMetric label="Pending" value={metrics.pending} />
@@ -196,14 +213,24 @@ export function DashboardPage() {
         <BigMetric label="Overrides" value={metrics.overrides} warn />
       </div>
 
+      {/* Money totals — visually distinct from people counts */}
+      <div className="mb-8 grid grid-cols-2 gap-3 rounded-lg border border-dashed bg-muted/30 p-3">
+        <MoneyMetric label="Confirmed paid" amount={metrics.totalMoneyPaid} currency={currency} accent />
+        <MoneyMetric label="Still owed" amount={metrics.totalMoneyOwed} currency={currency} />
+      </div>
+
       {/* Tabbed breakdowns */}
       <Tabs defaultValue="by-sg" onValueChange={handleTabChange}>
-        <TabsList className="mb-4 w-full justify-start sm:w-auto">
-          <TabsTrigger value="by-sg">By sub-group</TabsTrigger>
-          <TabsTrigger value="by-super">By super-group</TabsTrigger>
-          <TabsTrigger value="by-rt">By room type</TabsTrigger>
-          <TabsTrigger value="by-gender">By gender</TabsTrigger>
-        </TabsList>
+        {/* Scrollable tab strip on mobile */}
+        <div className="relative mb-4 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
+          <TabsList className="w-max justify-start">
+            <TabsTrigger value="by-sg">By sub-group</TabsTrigger>
+            <TabsTrigger value="by-super">By super-group</TabsTrigger>
+            <TabsTrigger value="by-rt">By room type</TabsTrigger>
+            <TabsTrigger value="by-gender">By gender</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── By sub-group ───────────────────────────────────────────────────── */}
         <TabsContent value="by-sg">
@@ -234,9 +261,9 @@ export function DashboardPage() {
                     <TableRow key={row.name}>
                       <TableCell className="font-medium">{row.name}</TableCell>
                       <TableCell className="text-right">{row.registered}</TableCell>
-                      <TableCell className="text-right text-emerald-600">{row.paid}</TableCell>
-                      <TableCell className="text-right text-amber-600">{row.partial}</TableCell>
-                      <TableCell className="text-right text-red-600">{row.pending}</TableCell>
+                      <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
+                      <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
+                      <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{row.waived}</TableCell>
                       <TableCell className="text-right">{row.roomed}</TableCell>
                       <TableCell className="text-right tabular-nums">
@@ -280,9 +307,9 @@ export function DashboardPage() {
                     <TableRow key={row.name} className={row.name === 'Unassigned' ? 'text-muted-foreground' : ''}>
                       <TableCell className="font-medium">{row.name}</TableCell>
                       <TableCell className="text-right">{row.registered}</TableCell>
-                      <TableCell className="text-right text-emerald-600">{row.paid}</TableCell>
-                      <TableCell className="text-right text-amber-600">{row.partial}</TableCell>
-                      <TableCell className="text-right text-red-600">{row.pending}</TableCell>
+                      <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
+                      <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
+                      <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
                       <TableCell className="text-right">{row.waived}</TableCell>
                       <TableCell className="text-right">{row.roomed}</TableCell>
                       <TableCell className="text-right tabular-nums">
@@ -332,7 +359,7 @@ export function DashboardPage() {
                         <TableCell className="text-right">{row.capacityTotal}</TableCell>
                         <TableCell className="text-right">{row.occupied}</TableCell>
                         <TableCell
-                          className={`text-right ${row.available <= 0 ? 'font-medium text-red-600' : 'text-emerald-600'}`}
+                          className={`text-right ${row.available <= 0 ? 'font-medium text-destructive' : 'text-status-paid'}`}
                         >
                           {row.available}
                         </TableCell>
@@ -367,7 +394,7 @@ export function DashboardPage() {
                       <TableCell className="text-right">{row.roomed}</TableCell>
                       <TableCell className="text-right">{row.capacity}</TableCell>
                       <TableCell
-                        className={`text-right ${row.available <= 0 ? 'font-medium text-red-600' : ''}`}
+                        className={`text-right ${row.available <= 0 ? 'font-medium text-destructive' : ''}`}
                       >
                         {row.available}
                       </TableCell>
@@ -380,6 +407,6 @@ export function DashboardPage() {
         </TabsContent>
       </Tabs>
       </>}
-    </div>
+    </PageContainer>
   )
 }

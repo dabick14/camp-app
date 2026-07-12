@@ -1,17 +1,9 @@
-import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import { formatMoney } from '@/lib/formatMoney'
 import {
   createRoomType,
@@ -21,33 +13,33 @@ import {
 } from '../services/roomTypeService'
 import type { RoomType } from '../types'
 
-type FormState = {
-  name: string
-  price: string
-  defaultCapacity: string
-  allowOverbook: boolean
+function validatePrice(raw: string | number): string | null {
+  const s = String(raw).trim()
+  if (s === '' || isNaN(Number(s))) return 'Price is required'
+  if (Number(s) < 0) return 'Price must be 0 or more'
+  if (/\.\d{3,}/.test(s)) return 'Maximum 2 decimal places'
+  return null
 }
 
-const EMPTY_FORM: FormState = { name: '', price: '', defaultCapacity: '', allowOverbook: false }
-
-function validateForm(form: FormState): string | null {
-  if (!form.name.trim()) return 'Name is required.'
-  const s = form.price.trim()
-  if (!s || isNaN(Number(s))) return 'Price is required.'
-  if (Number(s) < 0) return 'Price must be 0 or more.'
-  if (/\.\d{3,}/.test(s)) return 'Maximum 2 decimal places.'
-  const cap = Number(form.defaultCapacity)
-  if (!cap || cap < 1) return 'Capacity must be at least 1.'
-  return null
+interface EditState {
+  id: string
+  name: string
+  price: number | ''
+  defaultCapacity: number | ''
+  allowOverbook: boolean
 }
 
 export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; currency?: string }) {
   const [types, setTypes] = useState<RoomType[]>([])
   const [loading, setLoading] = useState(true)
-  const [dialog, setDialog] = useState<{ mode: 'add' | 'edit'; target?: RoomType } | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [editing, setEditing] = useState<EditState | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newPrice, setNewPrice] = useState('')
+  const [newCapacity, setNewCapacity] = useState('')
+  const [newOverbook, setNewOverbook] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -57,53 +49,38 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
     return () => { cancelled = true }
   }, [campId])
 
-  function openAdd() {
-    setForm(EMPTY_FORM)
-    setError('')
-    setDialog({ mode: 'add' })
+  useEffect(() => {
+    if (editing) nameInputRef.current?.focus()
+  }, [editing?.id])
+
+  function startEdit(rt: RoomType) {
+    setEditing({ id: rt.id, name: rt.name, price: rt.price, defaultCapacity: rt.defaultCapacity, allowOverbook: rt.allowOverbook })
   }
 
-  function openEdit(rt: RoomType) {
-    setForm({
-      name: rt.name,
-      price: String(rt.price),
-      defaultCapacity: String(rt.defaultCapacity),
-      allowOverbook: rt.allowOverbook,
-    })
+  async function saveEdit() {
+    if (!editing) return
+    const name = editing.name.trim()
+    const price = Number(editing.price)
+    const cap = Number(editing.defaultCapacity)
+    if (!name) { setError('Name is required'); return }
+    const priceErr = validatePrice(editing.price)
+    if (priceErr) { setError(priceErr); return }
+    if (!cap || cap < 1) { setError('Capacity must be at least 1'); return }
     setError('')
-    setDialog({ mode: 'edit', target: rt })
-  }
-
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((f) => ({ ...f, [key]: value }))
-    setError('')
-  }
-
-  async function handleSave() {
-    const err = validateForm(form)
-    if (err) { setError(err); return }
-
-    const name = form.name.trim()
-    const price = Number(form.price)
-    const defaultCapacity = Number(form.defaultCapacity)
-    const { allowOverbook } = form
-
     setSaving(true)
-    setError('')
     try {
-      if (dialog?.mode === 'add') {
-        const now = Timestamp.now()
-        const id = await createRoomType(campId, { name, price, defaultCapacity, allowOverbook, order: types.length })
-        setTypes([...types, { id, name, price, defaultCapacity, allowOverbook, order: types.length, createdAt: now, updatedAt: now }])
-      } else if (dialog?.mode === 'edit' && dialog.target) {
-        await updateRoomType(campId, dialog.target.id, { name, price, defaultCapacity, allowOverbook })
-        setTypes(types.map((rt) =>
-          rt.id === dialog.target!.id ? { ...rt, name, price, defaultCapacity, allowOverbook } : rt,
-        ))
-      }
-      setDialog(null)
-    } catch {
-      setError('Failed to save. Try again.')
+      await updateRoomType(campId, editing.id, {
+        name,
+        price,
+        defaultCapacity: cap,
+        allowOverbook: editing.allowOverbook,
+      })
+      setTypes(types.map((rt) =>
+        rt.id === editing.id
+          ? { ...rt, name, price, defaultCapacity: cap, allowOverbook: editing.allowOverbook }
+          : rt
+      ))
+      setEditing(null)
     } finally {
       setSaving(false)
     }
@@ -117,136 +94,139 @@ export function RoomTypesEditor({ campId, currency = 'GHS' }: { campId: string; 
     await reorderRoomTypes(campId, next.map((rt) => rt.id))
   }
 
+  async function add() {
+    const name = newName.trim()
+    const price = Number(newPrice)
+    const cap = Number(newCapacity)
+    if (!name) { setError('Name is required'); return }
+    const priceErr = validatePrice(newPrice)
+    if (priceErr) { setError(priceErr); return }
+    if (!cap || cap < 1) { setError('Default capacity must be at least 1'); return }
+    setError('')
+    setSaving(true)
+    try {
+      const now = Timestamp.now()
+      const id = await createRoomType(campId, {
+        name,
+        price,
+        defaultCapacity: cap,
+        allowOverbook: newOverbook,
+        order: types.length,
+      })
+      setTypes([...types, { id, name, price, defaultCapacity: cap, allowOverbook: newOverbook, order: types.length, createdAt: now, updatedAt: now }])
+      setNewName('')
+      setNewPrice('')
+      setNewCapacity('')
+      setNewOverbook(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   return (
-    <>
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Define types before adding rooms. Price here sets the default participant fee.
-        </p>
+    <div className="space-y-3">
+      {types.length === 0 && (
+        <p className="text-sm text-muted-foreground">No room types yet.</p>
+      )}
 
-        {types.length === 0 && (
-          <p className="text-sm italic text-muted-foreground">No room types yet.</p>
-        )}
+      <ul className="divide-y rounded-md border">
+        {types.map((rt, i) => (
+          <li key={rt.id} className="flex items-center gap-2 px-3 py-2">
+            <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>
 
-        {types.length > 0 && (
-          <ul className="divide-y overflow-hidden rounded-xl border">
-            {types.map((rt, i) => (
-              <li key={rt.id} className="flex items-stretch">
-                {/* Tappable two-line row */}
-                <button
-                  className="flex flex-1 items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40"
-                  onClick={() => openEdit(rt)}
-                >
-                  <span className="w-5 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{rt.name}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {formatMoney(rt.price, currency)}
-                      {' · '}cap {rt.defaultCapacity}
-                      {' · '}{rt.allowOverbook ? 'overbook' : 'hard cap'}
-                    </div>
-                  </div>
-                </button>
-                {/* Reorder — sibling, not nested inside the tappable button */}
-                <div className="flex shrink-0 items-stretch border-l">
-                  <button
-                    onClick={() => move(i, -1)}
-                    disabled={i === 0}
-                    className="flex items-center px-2.5 text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-30"
-                    aria-label="Move up"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => move(i, 1)}
-                    disabled={i === types.length - 1}
-                    className="flex items-center border-l px-2.5 text-muted-foreground transition-colors hover:bg-muted/40 disabled:opacity-30"
-                    aria-label="Move down"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <Button variant="outline" onClick={openAdd} className="w-full sm:w-auto">
-          <Plus className="h-4 w-4" />
-          Add room type
-        </Button>
-      </div>
-
-      <Dialog open={!!dialog} onOpenChange={(open) => { if (!open && !saving) setDialog(null) }}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>
-              {dialog?.mode === 'add' ? 'New room type' : 'Edit room type'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="rt-name">Name</Label>
-              <Input
-                id="rt-name"
-                autoFocus
-                value={form.name}
-                onChange={(e) => setField('name', e.target.value)}
-                placeholder="e.g. Dormitory"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="rt-price">Price ({currency})</Label>
+            {editing?.id === rt.id ? (
+              /* ── inline edit row ── */
+              <div className="flex flex-1 flex-wrap items-center gap-2">
                 <Input
-                  id="rt-price"
+                  ref={nameInputRef}
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  placeholder="Type name"
+                  className="h-7 w-32 text-sm"
+                />
+                <Input
                   type="number"
                   min={0}
                   step="0.01"
-                  value={form.price}
-                  onChange={(e) => setField('price', e.target.value)}
-                  placeholder="0.00"
+                  value={editing.price}
+                  onChange={(e) => setEditing({ ...editing, price: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="Price"
+                  className="h-7 w-24 text-sm"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="rt-cap">Default capacity</Label>
                 <Input
-                  id="rt-cap"
                   type="number"
                   min={1}
-                  value={form.defaultCapacity}
-                  onChange={(e) => setField('defaultCapacity', e.target.value)}
-                  placeholder="20"
+                  value={editing.defaultCapacity}
+                  onChange={(e) => setEditing({ ...editing, defaultCapacity: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="Capacity"
+                  className="h-7 w-24 text-sm"
                 />
+                <div className="flex items-center gap-1.5 text-sm">
+                  <Switch
+                    checked={editing.allowOverbook}
+                    onCheckedChange={(v) => setEditing({ ...editing, allowOverbook: v })}
+                    className="scale-75"
+                  />
+                  <span className="text-xs text-muted-foreground">Overbook</span>
+                </div>
+                <Button size="sm" onClick={saveEdit} disabled={saving} className="h-7 px-2 text-xs">Save</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(null)} className="h-7 px-2 text-xs">Cancel</Button>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="rt-overbook"
-                checked={form.allowOverbook}
-                onCheckedChange={(v) => setField('allowOverbook', v)}
-              />
-              <Label htmlFor="rt-overbook" className="cursor-pointer font-normal">
-                Allow overbooking
-              </Label>
-            </div>
-          </div>
+            ) : (
+              /* ── display row: two-line so nothing overlaps on mobile ── */
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{rt.name}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  {formatMoney(rt.price, currency)}
+                  {' · '}cap {rt.defaultCapacity}
+                  {' · '}{rt.allowOverbook ? 'overbook ✓' : 'hard cap'}
+                </div>
+              </div>
+            )}
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex shrink-0 items-center gap-1">
+              {editing?.id !== rt.id && (
+                <Button size="sm" variant="ghost" onClick={() => startEdit(rt)} className="h-7 w-7 p-0" aria-label="Edit">
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0} className="h-7 w-7 p-0" aria-label="Move up">
+                <ChevronUp className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => move(i, 1)} disabled={i === types.length - 1} className="h-7 w-7 p-0" aria-label="Move down">
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      {/* add form */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Name</label>
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="e.g. Dormitory" className="h-8 w-36 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Price ({currency})</label>
+          <Input type="number" min={0} step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0.00" className="h-8 w-24 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Default capacity</label>
+          <Input type="number" min={1} value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} placeholder="20" className="h-8 w-20 text-sm" />
+        </div>
+        <div className="flex items-center gap-1.5 pb-0.5">
+          <Switch checked={newOverbook} onCheckedChange={setNewOverbook} className="scale-75" />
+          <span className="text-xs text-muted-foreground">Allow overbook</span>
+        </div>
+        <Button variant="outline" size="sm" onClick={add} disabled={saving || !newName.trim() || newPrice === '' || !newCapacity}>
+          Add type
+        </Button>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
   )
 }

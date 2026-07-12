@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageTitle } from '@/components/ui/page-title'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SubGroupSelect } from '@/features/camps/components/SubGroupSelect'
+import type { SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { checkPhoneDuplicate } from '@/features/participants/services/participantService'
 import {
@@ -13,6 +15,7 @@ import {
   stripPhone,
 } from '@/features/registration/utils'
 import { formatMoney } from '@/lib/formatMoney'
+import { PageContainer } from '@/components/ui/page-container'
 
 const ADMIN_ADD_URL =
   'https://us-central1-camp-app-119bb.cloudfunctions.net/adminAddParticipant'
@@ -66,6 +69,7 @@ export function AdminAddParticipantPage() {
   const navigate = useNavigate()
   const { id: campId } = useParams<{ id: string }>()
   const { camp, subGroups, roomTypes } = useCampData()
+  const superGroups: SuperGroup[] = camp?.superGroups ?? []
   const currency = camp?.currency ?? 'GHS'
 
   // ─── form state ─────────────────────────────────────────────────────────────
@@ -226,17 +230,8 @@ export function AdminAddParticipantPage() {
   const normalizedPhone = isValidGhanaPhone(phone) ? normalizePhone(phone) : ''
 
   return (
-    <div className="mx-auto max-w-lg px-6 py-8">
-      <button
-        type="button"
-        onClick={() => navigate(`/admin/camps/${campId}`)}
-        className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to participants
-      </button>
-
-      <h1 className="mb-6 text-xl font-semibold">Add participant</h1>
+    <PageContainer>
+      <PageTitle className="mb-6">Add participant</PageTitle>
 
       <form id="admin-add-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Full name */}
@@ -349,18 +344,13 @@ export function AdminAddParticipantPage() {
 
         {/* Sub-group */}
         <Field label="Sub-group / Council" required error={errors.subGroupId}>
-          <select
+          <SubGroupSelect
+            subGroups={subGroups}
+            superGroups={superGroups}
             value={subGroupId}
-            onChange={(e) => setSubGroupId(e.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="">Select a sub-group…</option>
-            {subGroups.map((sg) => (
-              <option key={sg.id} value={sg.id}>
-                {sg.name}
-              </option>
-            ))}
-          </select>
+            onChange={setSubGroupId}
+            placeholder="Select a sub-group…"
+          />
         </Field>
 
         {/* Room type */}
@@ -447,6 +437,6 @@ export function AdminAddParticipantPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }

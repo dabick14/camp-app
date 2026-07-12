@@ -44,7 +44,7 @@ Safe to re-run: it wipes the emulator namespace and recreates everything.
 ```bash
 npm run dev
 ```
-
+                                
 Open [http://localhost:5173](http://localhost:5173). The console prints `⚠️ Connected to LOCAL emulators — not production.` on every dev start — this is expected and confirms you are not touching prod.
 
 **Emulator UI** — [http://localhost:4000](http://localhost:4000)

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
-import { ChevronLeft, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { PageError, PageLoading } from '@/components/ui/states'
+import { PageContainer } from '@/components/ui/page-container'
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -233,11 +234,11 @@ export function BatchDetailPage() {
 
   useEffect(() => { loadBatch() }, [loadBatch])
 
-  if (loading) return <div className="px-6 py-6"><PageLoading /></div>
+  if (loading) return <PageContainer><PageLoading /></PageContainer>
   if (loadError) return (
-    <div className="px-6 py-6">
+    <PageContainer>
       <PageError message={loadError} onRetry={loadBatch} />
-    </div>
+    </PageContainer>
   )
   if (!batch) return null
 
@@ -269,15 +270,7 @@ export function BatchDetailPage() {
   }
 
   return (
-    <div className="px-6 py-6">
-      <Link
-        to={`/admin/camps/${campId}/payments`}
-        className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-3 w-3" />
-        Back to payments
-      </Link>
-
+    <PageContainer>
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
@@ -454,6 +447,6 @@ export function BatchDetailPage() {
           onClose={() => setShowVariance(false)}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }
