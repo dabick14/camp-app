@@ -7,6 +7,8 @@
     "dev": "vite",
     "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data",
     "dev:seed": "tsx scripts/seed-dev.ts",
+    "dev:seed:participants": "tsx scripts/seed-dev-participants.ts",
+    "dev:seed:participants:clean": "tsx scripts/seed-dev-participants.ts --clean",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
