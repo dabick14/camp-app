@@ -340,7 +340,7 @@ function TagsCell({ tags }: { tags: string[] }) {
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export function ParticipantListPage() {
-  const { camp, participants, subGroups, roomTypes, loading, error, refresh } = useCampData()
+  const { camp, participants, subGroups, roomTypes, loading, error, participantsLoading, participantsError, refresh } = useCampData()
   const superGroups: SuperGroup[] = camp?.superGroups ?? []
   const currency = camp?.currency ?? 'GHS'
   const location = useLocation()
@@ -951,19 +951,30 @@ export function ParticipantListPage() {
         </div>
       )}
 
+      {/* Participant load error (non-blocking — shell still usable) */}
+      {participantsError && !participantsLoading && (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <span>Couldn't load all participants.</span>
+          <button type="button" onClick={refresh} className="underline hover:no-underline">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Result count */}
       <p className="mb-3 text-sm text-muted-foreground">
-        {loading
+        {loading || (participantsLoading && participants.length === 0)
           ? 'Loading…'
-          : `${filtered.length.toLocaleString()} participant${filtered.length !== 1 ? 's' : ''}${
-              filtered.length !== participants.length
-                ? ` (${participants.length.toLocaleString()} total)`
-                : ''
-            }`}
+          : <>
+              {filtered.length.toLocaleString()} participant{filtered.length !== 1 ? 's' : ''}
+              {filtered.length !== participants.length && ` (${participants.length.toLocaleString()} total)`}
+              {participantsLoading && <span className="opacity-60"> · loading more…</span>}
+            </>
+        }
       </p>
 
       {/* Table */}
-      {pageSlice.length === 0 && !loading ? (
+      {pageSlice.length === 0 && !loading && !(participantsLoading && participants.length === 0) ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-muted-foreground">No participants match the current filters.</p>
         </div>
