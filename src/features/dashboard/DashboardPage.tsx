@@ -12,33 +12,52 @@ import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
 
-function BigMetric({ label, value, sub, warn, accent }: { label: string; value: number; sub?: string; warn?: boolean; accent?: boolean }) {
-  const alert = warn && value > 0
+function BigMetric({ label, value, sub, warn, accent, skeleton }: {
+  label: string; value: number; sub?: string; warn?: boolean; accent?: boolean; skeleton?: boolean
+}) {
+  const alert = !skeleton && warn && value > 0
   return (
     <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-destructive/20 bg-destructive/5 text-foreground' : 'bg-card text-card-foreground'}`}>
       <div className="flex items-center gap-1.5">
         {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />}
-        <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-destructive' : accent ? 'text-primary' : ''}`}>{value.toLocaleString()}</p>
+        {skeleton
+          ? <span className="my-0.5 block h-9 w-14 animate-pulse rounded bg-muted" />
+          : <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-destructive' : accent ? 'text-primary' : ''}`}>{value.toLocaleString()}</p>
+        }
       </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground">{skeleton ? <span className="inline-block h-3 w-12 animate-pulse rounded bg-muted align-middle" /> : sub}</p>}
     </div>
   )
 }
 
-function MoneyMetric({ label, amount, currency, accent }: { label: string; amount: number; currency: string; accent?: boolean }) {
+function MoneyMetric({ label, amount, currency, accent, skeleton }: {
+  label: string; amount: number; currency: string; accent?: boolean; skeleton?: boolean
+}) {
   return (
     <div className="rounded-lg border bg-card px-5 py-4">
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-bold tabular-nums ${accent ? 'text-status-paid' : ''}`}>
-        {currency} {amount.toLocaleString()}
-      </p>
+      {skeleton
+        ? <span className="block h-8 w-32 animate-pulse rounded bg-muted" />
+        : <p className={`text-2xl font-bold tabular-nums ${accent ? 'text-status-paid' : ''}`}>
+            {currency} {amount.toLocaleString()}
+          </p>
+      }
     </div>
   )
 }
 
+function Sk() {
+  return <span className="inline-block h-4 w-8 animate-pulse rounded bg-muted align-middle" />
+}
+function SkWide() {
+  return <span className="inline-block h-4 w-20 animate-pulse rounded bg-muted align-middle" />
+}
+
 export function DashboardPage() {
-  const { camp, participants, subGroups, roomTypes, rooms, loading, error, refresh } = useCampData()
+  const { camp, participants, subGroups, roomTypes, rooms, loading, error, participantsLoading, refresh } = useCampData()
+  // True only during the gap before the first participant page arrives.
+  const participantsPending = participantsLoading && participants.length === 0
   const currency = camp?.currency ?? 'GHS'
 
   // Track which tabs have been opened so we can lazily compute their breakdowns.
@@ -205,18 +224,18 @@ export function DashboardPage() {
 
       {/* Summary cards — people counts */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <BigMetric label="Registered" value={metrics.registered} accent />
-        <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} />
-        <BigMetric label="Partial" value={metrics.partial} />
-        <BigMetric label="Pending" value={metrics.pending} />
-        <BigMetric label="Roomed" value={metrics.roomed} />
-        <BigMetric label="Overrides" value={metrics.overrides} warn />
+        <BigMetric label="Registered" value={metrics.registered} accent skeleton={participantsPending} />
+        <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} skeleton={participantsPending} />
+        <BigMetric label="Partial" value={metrics.partial} skeleton={participantsPending} />
+        <BigMetric label="Pending" value={metrics.pending} skeleton={participantsPending} />
+        <BigMetric label="Roomed" value={metrics.roomed} skeleton={participantsPending} />
+        <BigMetric label="Overrides" value={metrics.overrides} warn skeleton={participantsPending} />
       </div>
 
       {/* Money totals — visually distinct from people counts */}
       <div className="mb-8 grid grid-cols-2 gap-3 rounded-lg border border-dashed bg-muted/30 p-3">
-        <MoneyMetric label="Confirmed paid" amount={metrics.totalMoneyPaid} currency={currency} accent />
-        <MoneyMetric label="Still owed" amount={metrics.totalMoneyOwed} currency={currency} />
+        <MoneyMetric label="Confirmed paid" amount={metrics.totalMoneyPaid} currency={currency} accent skeleton={participantsPending} />
+        <MoneyMetric label="Still owed" amount={metrics.totalMoneyOwed} currency={currency} skeleton={participantsPending} />
       </div>
 
       {/* Tabbed breakdowns */}
@@ -260,17 +279,17 @@ export function DashboardPage() {
                   bySubGroup.map((row) => (
                     <TableRow key={row.name}>
                       <TableCell className="font-medium">{row.name}</TableCell>
-                      <TableCell className="text-right">{row.registered}</TableCell>
-                      <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
-                      <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
-                      <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{row.waived}</TableCell>
-                      <TableCell className="text-right">{row.roomed}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.registered}</TableCell>
+                      <TableCell className="text-right text-status-paid">{participantsPending ? <Sk /> : row.paid}</TableCell>
+                      <TableCell className="text-right text-status-partial">{participantsPending ? <Sk /> : row.partial}</TableCell>
+                      <TableCell className="text-right text-status-pending">{participantsPending ? <Sk /> : row.pending}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{participantsPending ? <Sk /> : row.waived}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.roomed}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.totalExpected, currency)}
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.totalReceived, currency)}
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalReceived, currency)}
                       </TableCell>
                     </TableRow>
                   ))
@@ -306,17 +325,17 @@ export function DashboardPage() {
                   {bySuperGroup.rows.map((row) => (
                     <TableRow key={row.name} className={row.name === 'Unassigned' ? 'text-muted-foreground' : ''}>
                       <TableCell className="font-medium">{row.name}</TableCell>
-                      <TableCell className="text-right">{row.registered}</TableCell>
-                      <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
-                      <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
-                      <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
-                      <TableCell className="text-right">{row.waived}</TableCell>
-                      <TableCell className="text-right">{row.roomed}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.registered}</TableCell>
+                      <TableCell className="text-right text-status-paid">{participantsPending ? <Sk /> : row.paid}</TableCell>
+                      <TableCell className="text-right text-status-partial">{participantsPending ? <Sk /> : row.partial}</TableCell>
+                      <TableCell className="text-right text-status-pending">{participantsPending ? <Sk /> : row.pending}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.waived}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.roomed}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.totalExpected, currency)}
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.totalReceived, currency)}
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalReceived, currency)}
                       </TableCell>
                     </TableRow>
                   ))}

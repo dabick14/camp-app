@@ -24,6 +24,13 @@ function formatDate(ts: { toDate(): Date }) {
   return ts.toDate().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function Sk() {
+  return <span className="inline-block h-4 w-8 animate-pulse rounded bg-muted align-middle" />
+}
+function SkWide() {
+  return <span className="inline-block h-4 w-20 animate-pulse rounded bg-muted align-middle" />
+}
+
 const METHOD_LABEL: Record<string, string> = {
   MOMO: 'MoMo',
   CASH: 'Cash',
@@ -34,7 +41,8 @@ const METHOD_LABEL: Record<string, string> = {
 export function PaymentsPage() {
   const { id: campId } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { camp, subGroups, participants } = useCampData()
+  const { camp, subGroups, participants, participantsLoading } = useCampData()
+  const participantsPending = participantsLoading && participants.length === 0
   const superGroups: SuperGroup[] = camp?.superGroups ?? []
   const currency = camp?.currency ?? 'GHS'
 
@@ -160,18 +168,18 @@ export function PaymentsPage() {
                 summary.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell className="text-right">{row.registered}</TableCell>
-                    <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
-                    <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
-                    <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
+                    <TableCell className="text-right">{participantsPending ? <Sk /> : row.registered}</TableCell>
+                    <TableCell className="text-right text-status-paid">{participantsPending ? <Sk /> : row.paid}</TableCell>
+                    <TableCell className="text-right text-status-partial">{participantsPending ? <Sk /> : row.partial}</TableCell>
+                    <TableCell className="text-right text-status-pending">{participantsPending ? <Sk /> : row.pending}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.totalExpected, currency)}
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.totalReceived, currency)}
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalReceived, currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatMoney(row.totalExpected - row.totalReceived, currency)}
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalReceived, currency)}
                     </TableCell>
                     <TableCell className="text-center">
                       {row.unreconciled ? (
