@@ -1,8 +1,9 @@
 import {
   collection, doc, getDocs, updateDoc, runTransaction,
   arrayUnion, arrayRemove, serverTimestamp, deleteField,
-  query, where, limit,
+  query, where, limit, orderBy, startAfter,
 } from 'firebase/firestore'
+import type { QueryDocumentSnapshot } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { RoomType } from '@/features/rooms/types'
 import type { Participant } from '../types'
@@ -10,6 +11,25 @@ import type { Participant } from '../types'
 export async function listParticipants(campId: string): Promise<Participant[]> {
   const snap = await getDocs(collection(db, 'camps', campId, 'participants'))
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Participant)
+}
+
+const PARTICIPANT_PAGE_SIZE = 100
+
+export async function listParticipantsPage(
+  campId: string,
+  cursor: QueryDocumentSnapshot | null,
+): Promise<{ docs: Participant[]; lastDoc: QueryDocumentSnapshot | null; hasMore: boolean }> {
+  const ref = collection(db, 'camps', campId, 'participants')
+  const q = cursor
+    ? query(ref, orderBy('fullName'), limit(PARTICIPANT_PAGE_SIZE), startAfter(cursor))
+    : query(ref, orderBy('fullName'), limit(PARTICIPANT_PAGE_SIZE))
+  const snap = await getDocs(q)
+  const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Participant)
+  return {
+    docs,
+    lastDoc: snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null,
+    hasMore: snap.docs.length === PARTICIPANT_PAGE_SIZE,
+  }
 }
 
 function pRef(campId: string, participantId: string) {
