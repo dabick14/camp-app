@@ -255,6 +255,18 @@ export function BatchDetailPage() {
   const matches = claimedUnconfirmed.length > 0 && claimedSum === batch.amountReceived
   const diff = batch.amountReceived - claimedSum  // positive = we received more than claimed; negative = short
 
+  // Participants THIS batch confirmed — kept visible independent of the batch's
+  // current status so a reopened/reconciled batch never reads as if it did nothing.
+  const confirmedByBatch = participants
+    .filter((p) => p.confirmedBatchId === batch.id)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+  const confirmedTotal = confirmedByBatch.reduce((s, p) => s + p.feeOwed, 0)
+
+  const isReconciled = batch.status === 'RECONCILED'
+  // On the variance path amountAllocated stays 0, so this is the whole
+  // received sum — the part of this batch never matched to individuals.
+  const unallocated = batch.amountReceived - batch.amountAllocated
+
   async function handleReconcileAndConfirm() {
     if (!campId || !batchId) return
     setWorking(true)
@@ -351,18 +363,43 @@ export function BatchDetailPage() {
           <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(batch.amountReceived, currency)}</p>
         </div>
         <div className="rounded-lg border bg-card px-5 py-4">
-          <p className="text-sm text-muted-foreground">Claimed</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(claimedSum, currency)}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {claimedUnconfirmed.length} unconfirmed participant{claimedUnconfirmed.length !== 1 ? 's' : ''}
-          </p>
+          <p className="text-sm text-muted-foreground">Awaiting confirmation</p>
+          {isReconciled && claimedUnconfirmed.length === 0 ? (
+            <>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">✓ All confirmed</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">No participants awaiting confirmation</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(claimedSum, currency)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {claimedUnconfirmed.length} unconfirmed participant{claimedUnconfirmed.length !== 1 ? 's' : ''}
+              </p>
+            </>
+          )}
         </div>
-        <div className={`rounded-lg border px-5 py-4 ${!matches && batch.status === 'OPEN' ? 'border-amber-300 bg-amber-50' : matches ? 'border-emerald-300 bg-emerald-50' : 'bg-card'}`}>
-          <p className="text-sm text-muted-foreground">Difference</p>
-          <p className={`mt-1 text-2xl font-semibold tabular-nums ${!matches && batch.status === 'OPEN' ? 'text-amber-700' : matches ? 'text-emerald-700' : ''}`}>
-            {matches ? '✓ Match' : diff > 0 ? `+${formatMoney(diff, currency)}` : formatMoney(diff, currency)}
-          </p>
-          {batch.status === 'OPEN' && (
+        {isReconciled && !batch.varianceAcknowledged ? (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-4">
+            <p className="text-sm text-muted-foreground">Confirmed</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">
+              ✓ {formatMoney(batch.amountAllocated, currency)}
+            </p>
+            <p className="mt-0.5 text-xs text-emerald-600">Match — reconciled</p>
+          </div>
+        ) : isReconciled && batch.varianceAcknowledged ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-5 py-4">
+            <p className="text-sm text-muted-foreground">Variance</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-700">
+              {formatMoney(unallocated, currency)}
+            </p>
+            <p className="mt-0.5 text-xs text-amber-600">Reconciled with variance · not allocated to individuals</p>
+          </div>
+        ) : (
+          <div className={`rounded-lg border px-5 py-4 ${!matches ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50'}`}>
+            <p className="text-sm text-muted-foreground">Difference</p>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${!matches ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {matches ? '✓ Match' : diff > 0 ? `+${formatMoney(diff, currency)}` : formatMoney(diff, currency)}
+            </p>
             <p className="mt-0.5 text-xs">
               {matches
                 ? <span className="text-emerald-600">Ready to confirm</span>
@@ -371,12 +408,12 @@ export function BatchDetailPage() {
                   : <span className="text-amber-600">Short by {formatMoney(-diff, currency)} · blocks registration</span>
               }
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Reconciliation panel — claimed-but-unconfirmed participants */}
-      {(claimedUnconfirmed.length > 0 || batch.status === 'OPEN') && (
+      {(claimedUnconfirmed.length > 0 || batch.status === 'OPEN' || confirmedByBatch.length > 0) && (
         <>
           <Separator />
           <section className="mt-8">
@@ -385,7 +422,9 @@ export function BatchDetailPage() {
             </h3>
             {claimedUnconfirmed.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No participants have been claimed by the coordinator yet.
+                {confirmedByBatch.length > 0
+                  ? 'All claimed participants have been confirmed.'
+                  : 'No participants have been claimed by the coordinator yet.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-md border">
@@ -411,6 +450,64 @@ export function BatchDetailPage() {
                 </table>
               </div>
             )}
+          </section>
+        </>
+      )}
+
+      {/* Confirmed-by-this-batch panel — the permanent record of who this batch
+          confirmed. Visible regardless of the batch's current status so a
+          reopened batch never reads as if it confirmed no one. */}
+      {confirmedByBatch.length > 0 && (
+        <>
+          <Separator />
+          <section className="mt-8">
+            <div className="mb-3 flex items-baseline justify-between gap-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Confirmed by this batch ({confirmedByBatch.length})
+              </h3>
+              <p className="text-sm tabular-nums text-muted-foreground">
+                Total {formatMoney(confirmedTotal, currency)}
+              </p>
+            </div>
+
+            {/* Mobile: stacked cards (sub-group names run long and don't fit a table) */}
+            <div className="space-y-2 sm:hidden">
+              {confirmedByBatch.map((p) => (
+                <div key={p.id} className="rounded-md border bg-card px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium">{p.fullName}</p>
+                    <p className="shrink-0 tabular-nums">{formatMoney(p.feeOwed, currency)}</p>
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{p.subGroupName}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden overflow-x-auto rounded-md border sm:block">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Name</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Sub-group</th>
+                    <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Fee owed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {confirmedByBatch.map((p) => (
+                    <tr key={p.id} className="border-t">
+                      <td className="px-4 py-2.5">{p.fullName}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{p.subGroupName}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(p.feeOwed, currency)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t bg-muted/30 font-medium">
+                    <td className="px-4 py-2.5" colSpan={2}>Total</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatMoney(confirmedTotal, currency)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         </>
       )}

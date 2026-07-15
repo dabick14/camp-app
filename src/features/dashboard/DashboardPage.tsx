@@ -265,7 +265,7 @@ export function DashboardPage() {
                   <TableHead className="text-right">Waived</TableHead>
                   <TableHead className="text-right">Roomed</TableHead>
                   <TableHead className="text-right">Expected ({currency})</TableHead>
-                  <TableHead className="text-right">Received ({currency})</TableHead>
+                  <TableHead className="text-right">Confirmed ({currency})</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -318,7 +318,7 @@ export function DashboardPage() {
                     <TableHead className="text-right">Waived</TableHead>
                     <TableHead className="text-right">Roomed</TableHead>
                     <TableHead className="text-right">Expected ({currency})</TableHead>
-                    <TableHead className="text-right">Received ({currency})</TableHead>
+                    <TableHead className="text-right">Confirmed ({currency})</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

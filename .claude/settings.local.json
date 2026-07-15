@@ -33,7 +33,8 @@
       "Skill(run:*)",
       "Bash(git checkout *)",
       "Bash(firebase emulators:start --only firestore,auth --project demo-camp-app-rules-test-2)",
-      "Bash(FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npx vitest run)"
+      "Bash(FIRESTORE_EMULATOR_HOST=127.0.0.1:8085 npx vitest run)",
+      "Bash(gh pr create --base main --head design-pass --title 'feat\\(design\\): aesthetic pass — tokens, typography, layout, mobile UX' --body ' *)"
     ],
     "additionalDirectories": [
       "/Users/daviddagvanderpuije/dev/flstuff/camp-app",
