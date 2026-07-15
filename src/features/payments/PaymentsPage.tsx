@@ -5,10 +5,11 @@ import { PageTitle } from '@/components/ui/page-title'
 import { PageError } from '@/components/ui/states'
 import { PageContainer } from '@/components/ui/page-container'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SubGroupSelect } from '@/features/camps/components/SubGroupSelect'
 import type { SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
@@ -38,6 +39,28 @@ const METHOD_LABEL: Record<string, string> = {
   CASH: 'Cash',
   BANK: 'Bank',
   OTHER: 'Other',
+}
+
+// Shared between the mobile card and desktop table so the tri-state reads
+// identically at both sizes.
+function SubGroupStatusBadge({ status }: { status: SubGroupStatus }) {
+  if (status === 'RECONCILED') {
+    return (
+      <Badge variant="paid" className="gap-1">
+        <CheckCircle2 className="h-3 w-3" />
+        Reconciled
+      </Badge>
+    )
+  }
+  if (status === 'UNRECONCILED') {
+    return (
+      <Badge variant="partial" className="gap-1">
+        <AlertTriangle className="h-3 w-3" />
+        Unreconciled
+      </Badge>
+    )
+  }
+  return <Badge variant="waived">No payments</Badge>
 }
 
 export function PaymentsPage() {
@@ -145,91 +168,153 @@ export function PaymentsPage() {
         </div>
       </div>
 
-      {/* Part A — Per-sub-group summary */}
-      <section className="mb-8">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Sub-group summary
-        </h3>
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sub-group</TableHead>
-                <TableHead className="text-right">Registered</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead className="text-right">Partial</TableHead>
-                <TableHead className="text-right">Pending</TableHead>
-                <TableHead className="text-right">Expected ({currency})</TableHead>
-                <TableHead className="text-right">Cash received ({currency})</TableHead>
-                <TableHead className="text-right">Confirmed ({currency})</TableHead>
-                <TableHead className="text-right">Outstanding ({currency})</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {summary.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground">
-                    No sub-groups
-                  </TableCell>
-                </TableRow>
-              ) : (
-                summary.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.name}</TableCell>
-                    <TableCell className="text-right">{participantsPending ? <Sk /> : row.registered}</TableCell>
-                    <TableCell className="text-right text-status-paid">{participantsPending ? <Sk /> : row.paid}</TableCell>
-                    <TableCell className="text-right text-status-partial">{participantsPending ? <Sk /> : row.partial}</TableCell>
-                    <TableCell className="text-right text-status-pending">{participantsPending ? <Sk /> : row.pending}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalCashReceived, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalConfirmed, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalConfirmed, currency)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.status === 'UNRECONCILED' ? (
-                        <button
-                          className="inline-flex items-center gap-1 text-amber-600 hover:underline"
-                          onClick={() =>
-                            row.openBatch &&
-                            navigate(`/admin/camps/${campId}/payments/${row.openBatch!.id}`)
-                          }
-                        >
-                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                          Unreconciled
-                        </button>
-                      ) : row.status === 'RECONCILED' ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600">
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                          Reconciled
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">No payments</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      {/* Summary / Batches tabs — same tab pattern as the Dashboard */}
+      <Tabs defaultValue="summary">
+        {/* Scrollable tab strip on mobile (2 tabs fit, but kept consistent with Dashboard) */}
+        <div className="relative mb-4 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
+          <TabsList className="w-max justify-start">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="batches">Batches</TabsTrigger>
+          </TabsList>
         </div>
-      </section>
 
-      <Separator className="my-8" />
+        {/* ── Summary tab — per-sub-group ──────────────────────────────────── */}
+        <TabsContent value="summary">
+        {summary.length === 0 ? (
+          <p className="rounded-md border py-8 text-center text-sm text-muted-foreground">
+            No sub-groups
+          </p>
+        ) : (
+          <>
+            {/* Mobile: one card per sub-group — the 10-column table is unreadable
+                below sm, so surface only the figures that matter at a glance. */}
+            <div className="space-y-3 sm:hidden">
+              {summary.map((row) => (
+                <div key={row.id} className="rounded-lg border bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{row.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {participantsPending
+                          ? 'Loading…'
+                          : `${row.registered} registered · ${row.paid} paid · ${row.partial} partial · ${row.pending} pending`}
+                      </p>
+                    </div>
+                    <SubGroupStatusBadge status={row.status} />
+                  </div>
 
-      {/* Part B — Batch list */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Batches
-          </h3>
+                  <dl className="mt-3 space-y-1.5 border-t pt-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Expected</dt>
+                      <dd className="tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Cash received</dt>
+                      <dd className="tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalCashReceived, currency)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Confirmed</dt>
+                      <dd className="tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalConfirmed, currency)}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between font-medium">
+                      <dt className="text-muted-foreground">Outstanding</dt>
+                      <dd className="tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalConfirmed, currency)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {row.status === 'UNRECONCILED' && row.openBatch && (
+                    <button
+                      type="button"
+                      className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md bg-status-partial-bg px-3 text-sm font-medium text-status-partial"
+                      onClick={() => navigate(`/admin/camps/${campId}/payments/${row.openBatch!.id}`)}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      View unreconciled batch
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden overflow-x-auto rounded-md border sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sub-group</TableHead>
+                    <TableHead className="text-right">Registered</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Partial</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
+                    <TableHead className="text-right">Expected ({currency})</TableHead>
+                    <TableHead className="text-right">Cash received ({currency})</TableHead>
+                    <TableHead className="text-right">Confirmed ({currency})</TableHead>
+                    <TableHead className="text-right">Outstanding ({currency})</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summary.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">{row.name}</TableCell>
+                      <TableCell className="text-right">{participantsPending ? <Sk /> : row.registered}</TableCell>
+                      <TableCell className="text-right text-status-paid">{participantsPending ? <Sk /> : row.paid}</TableCell>
+                      <TableCell className="text-right text-status-partial">{participantsPending ? <Sk /> : row.partial}</TableCell>
+                      <TableCell className="text-right text-status-pending">{participantsPending ? <Sk /> : row.pending}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalCashReceived, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalConfirmed, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalConfirmed, currency)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {row.status === 'UNRECONCILED' ? (
+                          <button
+                            className="inline-flex items-center gap-1 text-status-partial hover:underline"
+                            onClick={() =>
+                              row.openBatch &&
+                              navigate(`/admin/camps/${campId}/payments/${row.openBatch!.id}`)
+                            }
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            Unreconciled
+                          </button>
+                        ) : row.status === 'RECONCILED' ? (
+                          <span className="inline-flex items-center gap-1 text-status-paid">
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                            Reconciled
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">No payments</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
+        </TabsContent>
+
+        {/* ── Batches tab ───────────────────────────────────────────────────── */}
+        <TabsContent value="batches">
+        <div className="mb-3 flex justify-end">
           {/* Sub-group filter */}
           <SubGroupSelect
             subGroups={subGroups}
@@ -237,7 +322,7 @@ export function PaymentsPage() {
             value={sgFilter}
             onChange={setSgFilter}
             noneLabel="All sub-groups"
-            className="w-48"
+            className="w-full sm:w-48"
           />
         </div>
 
@@ -250,52 +335,97 @@ export function PaymentsPage() {
             {batches.length === 0 ? 'No batches yet.' : 'No batches for this sub-group.'}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ref code</TableHead>
-                  <TableHead>Sub-group</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">Received ({currency})</TableHead>
-                  <TableHead className="text-right">Allocated ({currency})</TableHead>
-                  <TableHead className="text-right">Remaining ({currency})</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBatches.map((b) => (
-                  <TableRow
-                    key={b.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
-                  >
-                    <TableCell className="font-mono text-sm font-medium">
-                      {b.referenceCode}
-                    </TableCell>
-                    <TableCell>{b.subGroupName}</TableCell>
-                    <TableCell>{formatDate(b.receivedAt)}</TableCell>
-                    <TableCell>{METHOD_LABEL[b.method] ?? b.method}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountReceived, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountAllocated, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountReceived - b.amountAllocated, currency)}
-                    </TableCell>
-                    <TableCell>
-                      <BatchStatusBadge status={b.status} />
-                    </TableCell>
+          <>
+            {/* Mobile: one card per batch — the 8-column table overflows below sm */}
+            <div className="space-y-3 sm:hidden">
+              {filteredBatches.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
+                  className="w-full rounded-lg border bg-card p-4 text-left"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-sm font-medium">{b.referenceCode}</span>
+                    <BatchStatusBadge status={b.status} />
+                  </div>
+                  <dl className="mt-3 space-y-1.5 border-t pt-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Sub-group</dt>
+                      <dd className="text-right">{b.subGroupName}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Date</dt>
+                      <dd>{formatDate(b.receivedAt)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Method</dt>
+                      <dd>{METHOD_LABEL[b.method] ?? b.method}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Received</dt>
+                      <dd className="tabular-nums">{formatMoney(b.amountReceived, currency)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 font-medium">
+                      <dt className="text-muted-foreground">Remaining</dt>
+                      <dd className="tabular-nums">
+                        {formatMoney(b.amountReceived - b.amountAllocated, currency)}
+                      </dd>
+                    </div>
+                  </dl>
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden overflow-x-auto rounded-md border sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ref code</TableHead>
+                    <TableHead>Sub-group</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Received ({currency})</TableHead>
+                    <TableHead className="text-right">Allocated ({currency})</TableHead>
+                    <TableHead className="text-right">Remaining ({currency})</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredBatches.map((b) => (
+                    <TableRow
+                      key={b.id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
+                    >
+                      <TableCell className="font-mono text-sm font-medium">
+                        {b.referenceCode}
+                      </TableCell>
+                      <TableCell>{b.subGroupName}</TableCell>
+                      <TableCell>{formatDate(b.receivedAt)}</TableCell>
+                      <TableCell>{METHOD_LABEL[b.method] ?? b.method}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountReceived, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountAllocated, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountReceived - b.amountAllocated, currency)}
+                      </TableCell>
+                      <TableCell>
+                        <BatchStatusBadge status={b.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
-      </section>
+        </TabsContent>
+      </Tabs>
 
       {/* Create batch modal */}
       {showCreate && (
