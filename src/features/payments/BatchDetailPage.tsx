@@ -284,9 +284,9 @@ export function BatchDetailPage() {
   return (
     <PageContainer>
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-mono text-xl font-semibold">{batch.referenceCode}</h2>
             <BatchStatusBadge status={batch.status} />
             {batch.varianceAcknowledged && (
@@ -311,35 +311,54 @@ export function BatchDetailPage() {
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Actions — full-width stacked buttons on mobile, inline row on desktop */}
+        <div className="flex flex-col gap-2 sm:shrink-0 sm:items-end">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Button
               variant="outline"
               size="sm"
+              className="h-11 w-full whitespace-normal sm:h-7 sm:w-auto sm:whitespace-nowrap"
               onClick={() => downloadRosterCsv(sgParticipants, batch.subGroupName, batch.referenceCode)}
             >
-              <Download className="mr-1.5 h-3.5 w-3.5" />
+              <Download className="mr-1.5 h-3.5 w-3.5 shrink-0" />
               Download roster
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowEdit(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-11 w-full whitespace-normal sm:h-7 sm:w-auto sm:whitespace-nowrap"
+              onClick={() => setShowEdit(true)}
+            >
               Edit
             </Button>
             {batch.status === 'OPEN' ? (
               <>
                 <Button
                   size="sm"
+                  className="h-11 w-full whitespace-normal sm:h-7 sm:w-auto sm:whitespace-nowrap"
                   onClick={handleReconcileAndConfirm}
                   disabled={working || !matches}
                 >
                   Reconcile &amp; Confirm
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowVariance(true)} disabled={working}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-11 w-full whitespace-normal sm:h-7 sm:w-auto sm:whitespace-nowrap"
+                  onClick={() => setShowVariance(true)}
+                  disabled={working}
+                >
                   Reconcile with variance
                 </Button>
               </>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => setShowReopen(true)} disabled={working}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 w-full whitespace-normal sm:h-7 sm:w-auto sm:whitespace-nowrap"
+                onClick={() => setShowReopen(true)}
+                disabled={working}
+              >
                 Reopen
               </Button>
             )}
@@ -356,8 +375,9 @@ export function BatchDetailPage() {
         </div>
       </div>
 
-      {/* Amount breakdown */}
-      <div className="mb-8 grid grid-cols-3 gap-4">
+      {/* Amount breakdown — stacked on mobile so each card has room for its
+          number + label + sub-note (a 3-across row truncates at 390px) */}
+      <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="rounded-lg border bg-card px-5 py-4">
           <p className="text-sm text-muted-foreground">Received</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{formatMoney(batch.amountReceived, currency)}</p>
