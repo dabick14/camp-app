@@ -17,6 +17,8 @@ import { formatMoney } from '@/lib/formatMoney'
 import { listBatches } from './services/batchService'
 import { hasUnreconciledBatch } from './types'
 import type { PaymentBatch } from './types'
+
+type SubGroupStatus = 'NO_PAYMENTS' | 'UNRECONCILED' | 'RECONCILED'
 import { BatchStatusBadge } from './components/BatchStatusBadge'
 import { BatchForm } from './components/BatchForm'
 
@@ -76,7 +78,7 @@ export function PaymentsPage() {
         (p) => p.subGroupId === sg.id && p.registrationState === 'REGISTERED',
       )
       let paid = 0, partial = 0, pending = 0, waived = 0
-      let totalExpected = 0, totalReceived = 0
+      let totalExpected = 0, totalConfirmed = 0
       for (const p of sgParticipants) {
         const ps = derivePaymentState(p)
         if (ps === 'PAID') paid++
@@ -84,10 +86,15 @@ export function PaymentsPage() {
         else if (ps === 'PENDING') pending++
         else if (ps === 'WAIVED') waived++
         totalExpected += p.feeOwed
-        totalReceived += p.amountPaid
+        totalConfirmed += p.amountPaid
       }
       const sgBatches = batches.filter((b) => b.subGroupId === sg.id)
+      // Physical cash actually received from the sub-group, regardless of
+      // whether it's been matched to individual participants yet.
+      const totalCashReceived = sgBatches.reduce((s, b) => s + b.amountReceived, 0)
       const unreconciled = hasUnreconciledBatch(sgBatches)
+      const status: SubGroupStatus =
+        sgBatches.length === 0 ? 'NO_PAYMENTS' : unreconciled ? 'UNRECONCILED' : 'RECONCILED'
       // Find the OPEN batch with unallocated balance for the warning link
       const openBatch = unreconciled
         ? sgBatches.find((b) => b.status === 'OPEN' && b.amountReceived - b.amountAllocated > 0)
@@ -102,8 +109,9 @@ export function PaymentsPage() {
         pending,
         waived,
         totalExpected,
-        totalReceived,
-        unreconciled,
+        totalCashReceived,
+        totalConfirmed,
+        status,
         openBatch,
       }
     }).sort((a, b) => a.name.localeCompare(b.name))
@@ -152,7 +160,8 @@ export function PaymentsPage() {
                 <TableHead className="text-right">Partial</TableHead>
                 <TableHead className="text-right">Pending</TableHead>
                 <TableHead className="text-right">Expected ({currency})</TableHead>
-                <TableHead className="text-right">Received ({currency})</TableHead>
+                <TableHead className="text-right">Cash received ({currency})</TableHead>
+                <TableHead className="text-right">Confirmed ({currency})</TableHead>
                 <TableHead className="text-right">Outstanding ({currency})</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
@@ -160,7 +169,7 @@ export function PaymentsPage() {
             <TableBody>
               {summary.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">
                     No sub-groups
                   </TableCell>
                 </TableRow>
@@ -176,13 +185,16 @@ export function PaymentsPage() {
                       {participantsPending ? <SkWide /> : formatMoney(row.totalExpected, currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalReceived, currency)}
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalCashReceived, currency)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalReceived, currency)}
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalConfirmed, currency)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {participantsPending ? <SkWide /> : formatMoney(row.totalExpected - row.totalConfirmed, currency)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {row.unreconciled ? (
+                      {row.status === 'UNRECONCILED' ? (
                         <button
                           className="inline-flex items-center gap-1 text-amber-600 hover:underline"
                           onClick={() =>
@@ -193,11 +205,13 @@ export function PaymentsPage() {
                           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                           Unreconciled
                         </button>
-                      ) : (
+                      ) : row.status === 'RECONCILED' ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600">
                           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                           Reconciled
                         </span>
+                      ) : (
+                        <span className="text-muted-foreground">No payments</span>
                       )}
                     </TableCell>
                   </TableRow>
