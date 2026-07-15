@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SubGroupSelect } from '@/features/camps/components/SubGroupSelect'
 import type { SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
@@ -168,11 +168,19 @@ export function PaymentsPage() {
         </div>
       </div>
 
-      {/* Part A — Per-sub-group summary */}
-      <section className="mb-8">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Sub-group summary
-        </h3>
+      {/* Summary / Batches tabs — same tab pattern as the Dashboard */}
+      <Tabs defaultValue="summary">
+        {/* Scrollable tab strip on mobile (2 tabs fit, but kept consistent with Dashboard) */}
+        <div className="relative mb-4 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent sm:hidden" />
+          <TabsList className="w-max justify-start">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="batches">Batches</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* ── Summary tab — per-sub-group ──────────────────────────────────── */}
+        <TabsContent value="summary">
         {summary.length === 0 ? (
           <p className="rounded-md border py-8 text-center text-sm text-muted-foreground">
             No sub-groups
@@ -302,16 +310,11 @@ export function PaymentsPage() {
             </div>
           </>
         )}
-      </section>
+        </TabsContent>
 
-      <Separator className="my-8" />
-
-      {/* Part B — Batch list */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Batches
-          </h3>
+        {/* ── Batches tab ───────────────────────────────────────────────────── */}
+        <TabsContent value="batches">
+        <div className="mb-3 flex justify-end">
           {/* Sub-group filter */}
           <SubGroupSelect
             subGroups={subGroups}
@@ -319,7 +322,7 @@ export function PaymentsPage() {
             value={sgFilter}
             onChange={setSgFilter}
             noneLabel="All sub-groups"
-            className="w-48"
+            className="w-full sm:w-48"
           />
         </div>
 
@@ -332,52 +335,97 @@ export function PaymentsPage() {
             {batches.length === 0 ? 'No batches yet.' : 'No batches for this sub-group.'}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ref code</TableHead>
-                  <TableHead>Sub-group</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">Received ({currency})</TableHead>
-                  <TableHead className="text-right">Allocated ({currency})</TableHead>
-                  <TableHead className="text-right">Remaining ({currency})</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBatches.map((b) => (
-                  <TableRow
-                    key={b.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
-                  >
-                    <TableCell className="font-mono text-sm font-medium">
-                      {b.referenceCode}
-                    </TableCell>
-                    <TableCell>{b.subGroupName}</TableCell>
-                    <TableCell>{formatDate(b.receivedAt)}</TableCell>
-                    <TableCell>{METHOD_LABEL[b.method] ?? b.method}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountReceived, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountAllocated, currency)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(b.amountReceived - b.amountAllocated, currency)}
-                    </TableCell>
-                    <TableCell>
-                      <BatchStatusBadge status={b.status} />
-                    </TableCell>
+          <>
+            {/* Mobile: one card per batch — the 8-column table overflows below sm */}
+            <div className="space-y-3 sm:hidden">
+              {filteredBatches.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
+                  className="w-full rounded-lg border bg-card p-4 text-left"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-mono text-sm font-medium">{b.referenceCode}</span>
+                    <BatchStatusBadge status={b.status} />
+                  </div>
+                  <dl className="mt-3 space-y-1.5 border-t pt-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Sub-group</dt>
+                      <dd className="text-right">{b.subGroupName}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Date</dt>
+                      <dd>{formatDate(b.receivedAt)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Method</dt>
+                      <dd>{METHOD_LABEL[b.method] ?? b.method}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Received</dt>
+                      <dd className="tabular-nums">{formatMoney(b.amountReceived, currency)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 font-medium">
+                      <dt className="text-muted-foreground">Remaining</dt>
+                      <dd className="tabular-nums">
+                        {formatMoney(b.amountReceived - b.amountAllocated, currency)}
+                      </dd>
+                    </div>
+                  </dl>
+                </button>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden overflow-x-auto rounded-md border sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ref code</TableHead>
+                    <TableHead>Sub-group</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Received ({currency})</TableHead>
+                    <TableHead className="text-right">Allocated ({currency})</TableHead>
+                    <TableHead className="text-right">Remaining ({currency})</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredBatches.map((b) => (
+                    <TableRow
+                      key={b.id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => navigate(`/admin/camps/${campId}/payments/${b.id}`)}
+                    >
+                      <TableCell className="font-mono text-sm font-medium">
+                        {b.referenceCode}
+                      </TableCell>
+                      <TableCell>{b.subGroupName}</TableCell>
+                      <TableCell>{formatDate(b.receivedAt)}</TableCell>
+                      <TableCell>{METHOD_LABEL[b.method] ?? b.method}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountReceived, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountAllocated, currency)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(b.amountReceived - b.amountAllocated, currency)}
+                      </TableCell>
+                      <TableCell>
+                        <BatchStatusBadge status={b.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
-      </section>
+        </TabsContent>
+      </Tabs>
 
       {/* Create batch modal */}
       {showCreate && (
