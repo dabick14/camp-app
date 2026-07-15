@@ -139,8 +139,8 @@ export function LeaderRegisterPage() {
         if (cancelled) return
         if (!campData) { setPageStatus('error'); return }
         if (!campData.registrationOpen) { setPageStatus('closed'); return }
-        if (gated) { setPageStatus('gated'); return }
         setCamp(campData)
+        if (gated) { setPageStatus('gated'); return }
         setRoomTypes(types)
         setPageStatus('open')
       })
@@ -300,15 +300,52 @@ export function LeaderRegisterPage() {
 
   if (pageStatus === 'gated') {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <p className="text-lg font-medium">Registration paused for your group</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Your council has a payment batch that hasn't been fully reconciled.
-          No new registrations can be accepted until the admin reconciles it.
-          Contact your camp administrator to resolve this.
-        </p>
-        <div className="mt-6">
+      <div className="mx-auto max-w-lg px-4 py-10">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl font-semibold">{camp?.name}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{camp?.location}</p>
+          </div>
           <LogoutButton />
+        </div>
+
+        {/* Nav between leader screens — the roster stays reachable while gated */}
+        <div className="mb-6 flex gap-2 border-b pb-4">
+          <span className="flex items-center gap-1.5 rounded-md bg-brand-tint px-3 py-3.5 text-sm font-medium text-primary">
+            <UserPlus className="h-4 w-4" />
+            Register
+          </span>
+          <Link
+            to="/leader/roster"
+            className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
+          >
+            <ClipboardList className="h-4 w-4" />
+            Payment roster
+          </Link>
+          <Link
+            to="/guide"
+            className="flex items-center gap-1.5 rounded-md px-3 py-3.5 text-sm text-muted-foreground hover:bg-muted"
+          >
+            <BookOpen className="h-4 w-4" />
+            Guide
+          </Link>
+        </div>
+
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-center">
+          <p className="text-lg font-medium text-amber-900">New registrations are paused</p>
+          <p className="mt-2 text-sm text-amber-800">
+            {role.subGroupName} has a payment batch that hasn't been fully reconciled yet, so new
+            registrations are on hold until your admin reconciles it. You can still mark who has
+            paid — that's how the batch gets resolved.
+          </p>
+          <div className="mt-4">
+            <Button asChild size="xl">
+              <Link to="/leader/roster">
+                <ClipboardList className="h-4 w-4" />
+                Go to payment roster
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     )

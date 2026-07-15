@@ -12,9 +12,10 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getApps, initializeApp } from 'firebase-admin/app'
-import { getFirestore, Timestamp } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import type { CallableRequest } from 'firebase-functions/v2/https'
 import { setPaymentClaim } from './setPaymentClaim'
+import { leaderRegisterParticipant } from './leaderRegisterParticipant'
 
 beforeAll(() => {
   if (getApps().length === 0) {
@@ -431,5 +432,192 @@ describe('setPaymentClaim — confirmation lock', () => {
     const snap = await db().doc(`camps/${campId}/participants/${pId}`).get()
     expect(snap.data()!.confirmedBatchId).toBe('batch-001')
     expect(snap.data()!.amountPaid).toBe(400)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reconciliation gate — claiming must NEVER be blocked by an unreconciled batch
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// leaderRegisterParticipant blocks NEW registrations for a sub-group with an
+// OPEN batch that has an unallocated balance (the "deadlock" scenario: money
+// arrives before anyone claims). setPaymentClaim must remain completely
+// unaware of batch state — claiming is how the deadlock gets resolved, so it
+// must work even while the sub-group is gated for registration.
+
+async function seedBatch(
+  campId: string,
+  batchId: string,
+  subGroupId: string,
+  subGroupName: string,
+  opts: { amountReceived?: number; amountAllocated?: number; status?: 'OPEN' | 'RECONCILED' } = {},
+) {
+  await db().doc(`camps/${campId}/paymentBatches/${batchId}`).set({
+    referenceCode: 'GATE-001',
+    subGroupId,
+    subGroupName,
+    amountReceived: opts.amountReceived ?? 500,
+    amountAllocated: opts.amountAllocated ?? 0,
+    method: 'MOMO',
+    receivedAt: Timestamp.now(),
+    receivedBy: 'admin',
+    status: opts.status ?? 'OPEN',
+    varianceAcknowledged: false,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  })
+}
+
+async function seedRoomType(campId: string, rtId: string, price = 500) {
+  await db().doc(`camps/${campId}/roomTypes/${rtId}`).set({ name: 'Standard', price })
+}
+
+// Inline mirror of reconcileAndConfirm (src/features/payments/services/batchService.ts),
+// which is client-SDK only. Reimplemented here against the Admin SDK, same as
+// payments5b.test.ts mirrors createAllocations/voidAlloc, so the end-to-end
+// test can exercise the real reconciliation transaction shape.
+async function reconcileAndConfirm(
+  campId: string,
+  batchId: string,
+  claimedParticipantIds: string[],
+  uid: string,
+) {
+  await db().runTransaction(async (tx) => {
+    const batchSnap = await tx.get(db().doc(`camps/${campId}/paymentBatches/${batchId}`))
+    const batchData = batchSnap.data()!
+    if (batchData.status !== 'OPEN') throw new Error('Batch is not OPEN')
+
+    const participantSnaps = await Promise.all(
+      claimedParticipantIds.map((id) => tx.get(db().doc(`camps/${campId}/participants/${id}`))),
+    )
+    let expectedSum = 0
+    for (const snap of participantSnaps) {
+      const p = snap.data()!
+      expectedSum += p.feeOwed as number
+    }
+    if (expectedSum !== batchData.amountReceived) {
+      throw new Error(`Amount mismatch: ${expectedSum} !== ${batchData.amountReceived}`)
+    }
+
+    const now = FieldValue.serverTimestamp()
+    for (let i = 0; i < claimedParticipantIds.length; i++) {
+      const p = participantSnaps[i].data()!
+      tx.update(db().doc(`camps/${campId}/participants/${claimedParticipantIds[i]}`), {
+        amountPaid: p.feeOwed,
+        confirmedAt: now,
+        confirmedBy: uid,
+        confirmedBatchId: batchId,
+        updatedAt: now,
+        updatedBy: uid,
+      })
+    }
+    tx.update(db().doc(`camps/${campId}/paymentBatches/${batchId}`), {
+      status: 'RECONCILED',
+      amountAllocated: batchData.amountReceived,
+      updatedAt: now,
+      updatedBy: uid,
+    })
+  })
+}
+
+function makeGateRequest(data: unknown, uid?: string): CallableRequest<any> {
+  return {
+    data, rawRequest: {} as any,
+    auth: uid ? { uid, token: {} as any, rawToken: '' } : undefined,
+  } as CallableRequest<any>
+}
+
+describe('setPaymentClaim — reconciliation gate does not block claiming', () => {
+  it('leader CAN claim an existing participant while their sub-group has an OPEN batch with unallocated balance', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`
+    const pId = `p-${s}`, batchId = `batch-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedParticipant(campId, pId, sgId)
+    // Same condition leaderRegisterParticipant would reject on: OPEN + unallocated balance
+    await seedBatch(campId, batchId, sgId, 'Test Council', { amountReceived: 500, amountAllocated: 0 })
+
+    await expect(
+      setPaymentClaim.run(makeGateRequest({ participantId: pId, claimed: true }, leaderUid)),
+    ).resolves.toMatchObject({ claimed: true })
+
+    const snap = await db().doc(`camps/${campId}/participants/${pId}`).get()
+    expect(snap.data()!.paymentClaimed).toBe(true)
+
+    // Batch is untouched by claiming — claim is a pre-confirmation signal only
+    const batchSnap = await db().doc(`camps/${campId}/paymentBatches/${batchId}`).get()
+    expect(batchSnap.data()!.status).toBe('OPEN')
+    expect(batchSnap.data()!.amountAllocated).toBe(0)
+  })
+
+  it('leader CAN unclaim while gated too', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, leaderUid = `leader-${s}`
+    const pId = `p-${s}`, batchId = `batch-${s}`
+
+    await seedCamp(campId)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    await seedParticipant(campId, pId, sgId)
+    await seedBatch(campId, batchId, sgId, 'Test Council', { amountReceived: 500, amountAllocated: 0 })
+
+    await setPaymentClaim.run(makeGateRequest({ participantId: pId, claimed: true }, leaderUid))
+    await expect(
+      setPaymentClaim.run(makeGateRequest({ participantId: pId, claimed: false }, leaderUid)),
+    ).resolves.toMatchObject({ claimed: false })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// End-to-end: the deadlock (money arrives before claiming) is actually broken
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('deadlock — money arrives first, then claim, then reconcile, then gate clears', () => {
+  it('OPEN unreconciled batch blocks registration → leader claims anyway → admin reconciles → registration unblocks', async () => {
+    const s = uniq()
+    const campId = `camp-${s}`, sgId = `sg-${s}`, rtId = `rt-${s}`
+    const leaderUid = `leader-${s}`, batchId = `batch-${s}`
+    const p1 = `p1-${s}`, p2 = `p2-${s}`
+
+    await seedCamp(campId)
+    await seedRoomType(campId, rtId, 500)
+    await seedLeader(leaderUid, campId, sgId, 'Test Council')
+    // Two existing participants together owe exactly the lump sum received
+    await seedParticipant(campId, p1, sgId, 'Test Council', 300, 0)
+    await seedParticipant(campId, p2, sgId, 'Test Council', 200, 0)
+    // Admin records the batch before anyone has claimed — money arrived first
+    await seedBatch(campId, batchId, sgId, 'Test Council', { amountReceived: 500, amountAllocated: 0 })
+
+    // 1. Registration is blocked — the gate is intact
+    await expect(
+      leaderRegisterParticipant.run(makeGateRequest(
+        { fullName: 'Late Arrival', phone: `059${Math.floor(Math.random() * 9e6 + 1e6)}`, gender: 'M', roomTypePreferenceId: rtId },
+        leaderUid,
+      )),
+    ).rejects.toMatchObject({ code: 'failed-precondition' })
+
+    // 2. The leader can still claim their existing people — this is how the
+    //    batch gets resolved, so it must not be blocked by the same gate
+    await setPaymentClaim.run(makeGateRequest({ participantId: p1, claimed: true }, leaderUid))
+    await setPaymentClaim.run(makeGateRequest({ participantId: p2, claimed: true }, leaderUid))
+
+    const p1Snap = await db().doc(`camps/${campId}/participants/${p1}`).get()
+    const p2Snap = await db().doc(`camps/${campId}/participants/${p2}`).get()
+    expect(p1Snap.data()!.paymentClaimed).toBe(true)
+    expect(p2Snap.data()!.paymentClaimed).toBe(true)
+
+    // 3. Admin reconciles now that claims cover the received amount
+    await reconcileAndConfirm(campId, batchId, [p1, p2], 'admin-uid')
+
+    const batchSnap = await db().doc(`camps/${campId}/paymentBatches/${batchId}`).get()
+    expect(batchSnap.data()!.status).toBe('RECONCILED')
+
+    // 4. The gate is now clear — a new registration succeeds
+    const result = await leaderRegisterParticipant.run(makeGateRequest(
+      { fullName: 'New Registrant', phone: `059${Math.floor(Math.random() * 9e6 + 1e6)}`, gender: 'F', roomTypePreferenceId: rtId },
+      leaderUid,
+    ))
+    expect(result).toHaveProperty('participantId')
   })
 })
