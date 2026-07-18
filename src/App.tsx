@@ -20,6 +20,8 @@ import { LeaderRosterPage } from '@/features/leader-roster/LeaderRosterPage'
 import { PaymentsPage } from '@/features/payments/PaymentsPage'
 import { BatchDetailPage } from '@/features/payments/BatchDetailPage'
 import { LeaderGuidePage } from '@/features/guide/LeaderGuidePage'
+import { TicketsPage } from '@/features/tickets/pages/TicketsPage'
+import { TicketDetailPage } from '@/features/tickets/pages/TicketDetailPage'
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   return <ProtectedRoute requireRole="admin">{children}</ProtectedRoute>
@@ -71,6 +73,8 @@ export default function App() {
               <Route path="participants/new" element={<AdminAddParticipantPage />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="rooms" element={<RoomsPage />} />
+              <Route path="tickets" element={<TicketsPage />} />
+              <Route path="tickets/:ticketId" element={<TicketDetailPage />} />
               <Route path="leaders" element={<LeadersPage />} />
               <Route path="payments" element={<PaymentsPage />} />
               <Route path="payments/:batchId" element={<BatchDetailPage />} />

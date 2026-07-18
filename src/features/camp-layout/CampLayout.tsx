@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import {
   ChevronLeft, CreditCard, DoorOpen, LayoutGrid, MoreHorizontal,
-  RefreshCw, Settings, Users, UserCog,
+  RefreshCw, Settings, TriangleAlert, Users, UserCog,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatDateRange } from '@/lib/dates'
@@ -17,6 +17,7 @@ const NAV_ITEMS = (base: string) => [
 ]
 
 const MORE_ITEMS = (base: string) => [
+  { to: `${base}/tickets`,  label: 'Issues',       icon: TriangleAlert },
   { to: `${base}/leaders`,  label: 'Coordinators', icon: UserCog  },
   { to: `${base}/settings`, label: 'Settings',     icon: Settings },
 ]
@@ -157,6 +158,7 @@ function CampLayoutInner() {
           <nav className="flex w-full overflow-x-auto [&::-webkit-scrollbar]:hidden">
             {[
               ...NAV_ITEMS(base),
+              { to: `${base}/tickets`,  end: false, label: 'Issues',        icon: TriangleAlert },
               { to: `${base}/leaders`,  end: false, label: 'Coordinators', icon: UserCog  },
               { to: `${base}/settings`, end: false, label: 'Settings',      icon: Settings },
             ].map(({ to, end, label, icon: Icon }) => (

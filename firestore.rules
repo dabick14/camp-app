@@ -68,6 +68,11 @@ service cloud.firestore {
         allow read, write: if isAdmin();
       }
 
+      // Facility issue tickets — internal ops only, never coordinator/public.
+      match /tickets/{ticketId} {
+        allow read, write: if isAdmin();
+      }
+
       match /paymentBatches/{batchId} {
         // Admin full access.
         allow read, write: if isAdmin();

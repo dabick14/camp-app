@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { StoredImage } from '@/lib/imageUpload'
 
 export type PaymentMethod = 'MOMO' | 'CASH' | 'BANK' | 'OTHER'
 
@@ -19,12 +20,7 @@ export interface Allocation {
 export type BatchStatus = 'OPEN' | 'RECONCILED'
 
 /** A single attached receipt image (MoMo/cash handover screenshot) for a batch. */
-export interface BatchReceipt {
-  url: string          // download URL
-  storagePath: string  // Storage object path, needed to delete the object on removal
-  uploadedBy: string
-  uploadedAt: Timestamp
-}
+export type BatchReceipt = StoredImage
 
 export interface PaymentBatch {
   id: string

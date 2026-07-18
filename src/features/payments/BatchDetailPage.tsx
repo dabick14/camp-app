@@ -15,12 +15,13 @@ import {
 import { db } from '@/lib/firebase'
 import { formatMoney } from '@/lib/formatMoney'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
+import { ImageAttachments } from '@/components/ImageAttachments'
 import type { Participant } from '@/features/participants/types'
 import { reconcileAndConfirm, reconcileWithVariance, reopenBatch } from './services/batchService'
+import { removeReceiptFromBatch, uploadReceiptToBatch } from './services/receiptService'
 import type { PaymentBatch } from './types'
 import { BatchStatusBadge } from './components/BatchStatusBadge'
 import { BatchForm } from './components/BatchForm'
-import { BatchReceipts } from './components/BatchReceipts'
 
 const METHOD_LABEL: Record<string, string> = {
   MOMO: 'MoMo',
@@ -533,13 +534,19 @@ export function BatchDetailPage() {
         </>
       )}
 
-      <BatchReceipts
-        campId={campId!}
-        batchId={batchId!}
-        receipts={batch.receiptImageUrls ?? []}
-        uid={uid()}
-        onChange={loadBatch}
-      />
+      <Separator />
+      <section className="mt-8">
+        <ImageAttachments
+          images={batch.receiptImageUrls ?? []}
+          onUpload={(file, onProgress) => uploadReceiptToBatch(campId!, batchId!, file, uid(), onProgress)}
+          onRemove={(receipt) => removeReceiptFromBatch(campId!, batchId!, receipt, uid())}
+          onChange={loadBatch}
+          addLabel="Add screenshot"
+          altText="Batch receipt"
+          emptyMessage="No receipts attached yet. Attach a screenshot of the MoMo/cash handover for later reference."
+          removeConfirmMessage="Remove this receipt? This cannot be undone."
+        />
+      </section>
 
       {/* Modals */}
       {showEdit && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { PlusIcon, Trash2, UploadIcon } from 'lucide-react'
+import { getAuth } from 'firebase/auth'
+import { PlusIcon, TriangleAlert, Trash2, UploadIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,11 +36,19 @@ import { deleteRoom, listRooms } from '../services/roomService'
 import { listRoomTypes } from '../services/roomTypeService'
 import type { Room, RoomType } from '../types'
 import { PageTitle } from '@/components/ui/page-title'
+import { CreateTicketModal } from '@/features/tickets/components/CreateTicketModal'
+import { listTickets } from '@/features/tickets/services/ticketService'
+import type { Ticket } from '@/features/tickets/types'
 
 function naturalSort(rooms: Room[]): Room[] {
   return [...rooms].sort((a, b) =>
     a.number.localeCompare(b.number, undefined, { numeric: true }),
   )
+}
+
+function uid() {
+  const user = getAuth().currentUser
+  return user?.uid ?? 'admin'
 }
 
 export function RoomsPage() {
@@ -50,6 +59,7 @@ export function RoomsPage() {
 
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
+  const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -61,15 +71,19 @@ export function RoomsPage() {
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Room | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [ticketRoom, setTicketRoom] = useState<Room | null>(null)
 
   async function loadData() {
     if (!campId) return
     setLoading(true)
     setError('')
     try {
-      const [types, roomsData] = await Promise.all([listRoomTypes(campId), listRooms(campId)])
+      const [types, roomsData, ticketsData] = await Promise.all([
+        listRoomTypes(campId), listRooms(campId), listTickets(campId),
+      ])
       setRoomTypes(types)
       setRooms(roomsData)
+      setTickets(ticketsData)
     } catch {
       setError('Failed to load rooms.')
     } finally {
@@ -86,6 +100,22 @@ export function RoomsPage() {
     const data = await listRooms(campId)
     setRooms(data)
   }
+
+  async function refreshTickets() {
+    if (!campId) return
+    const data = await listTickets(campId)
+    setTickets(data)
+  }
+
+  // Open issues per room — CLOSED tickets don't count as "needs attention."
+  const openTicketCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const t of tickets) {
+      if (t.status === 'CLOSED') continue
+      counts.set(t.roomId, (counts.get(t.roomId) ?? 0) + 1)
+    }
+    return counts
+  }, [tickets])
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -204,7 +234,8 @@ export function RoomsPage() {
                 <TableHead className="w-24">Capacity</TableHead>
                 <TableHead className="w-24">Occupancy</TableHead>
                 <TableHead>Notes</TableHead>
-                <TableHead className="w-28 text-right">Actions</TableHead>
+                <TableHead className="w-20">Issues</TableHead>
+                <TableHead className="w-36 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -230,8 +261,28 @@ export function RoomsPage() {
                   <TableCell className="max-w-xs truncate text-muted-foreground">
                     {room.notes ?? '—'}
                   </TableCell>
+                  <TableCell>
+                    {openTicketCounts.has(room.id) ? (
+                      <Link to={`/admin/camps/${campId}/tickets`}>
+                        <Badge variant="pending" className="gap-1">
+                          <TriangleAlert className="h-3 w-3" />
+                          {openTicketCounts.get(room.id)}
+                        </Badge>
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setTicketRoom(room)}
+                      >
+                        Log issue
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -297,6 +348,16 @@ export function RoomsPage() {
         roomTypes={roomTypes}
         existingRooms={rooms}
         onImported={refreshRooms}
+      />
+
+      <CreateTicketModal
+        open={Boolean(ticketRoom)}
+        onOpenChange={(v) => !v && setTicketRoom(null)}
+        campId={campId!}
+        rooms={rooms}
+        uid={uid()}
+        initialRoomId={ticketRoom?.id}
+        onCreated={refreshTickets}
       />
 
       {deleteTarget && (

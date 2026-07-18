@@ -14,6 +14,7 @@
   /participants/{participantId}
   /paymentBatches/{batchId}
   /allocations/{allocationId}
+  /tickets/{ticketId}
 ```
 
 ## Document shapes
@@ -264,6 +265,57 @@ interface BatchReceipt {
 }
 ```
 
+### `camps/{campId}/tickets/{ticketId}`
+```ts
+{
+  roomId: string;                  // always tied to a room
+  roomNumber: string;              // denormalized
+  roomTypeName: string;            // denormalized
+
+  title: string;                   // e.g. "Leaking tap in bathroom"
+  description: string;
+
+  status: 'OPEN' | 'REPORTED' | 'FIXED_PENDING_CHECK' | 'CLOSED';
+  // Append-only audit trail — one entry per status transition, in order.
+  // Powers "reported on X, fixed on Y" without a separate collection.
+  statusHistory: TicketStatusEvent[];
+
+  // Free-form update log ("facilities said Thursday"), separate from the
+  // status trail so a note can be added without forcing a status change.
+  notes: TicketNote[];             // default []
+
+  imageUrls?: TicketImage[];       // photo(s) of the issue and/or the fix — see Storage section
+
+  createdAt: Timestamp;
+  createdBy: string;               // admin uid
+  updatedAt: Timestamp;
+  updatedBy: string;                // admin uid
+}
+
+interface TicketStatusEvent {
+  status: 'OPEN' | 'REPORTED' | 'FIXED_PENDING_CHECK' | 'CLOSED';
+  at: Timestamp;
+  by: string;                       // admin uid
+}
+
+interface TicketNote {
+  text: string;
+  at: Timestamp;
+  by: string;                       // admin uid
+}
+
+// Same shape as BatchReceipt (payments) — one shared StoredImage type
+// (src/lib/imageUpload.ts) backs both, so there's a single upload/compress/
+// delete implementation rather than two diverging ones.
+interface TicketImage {
+  url: string;          // download URL
+  storagePath: string;  // Storage object path — needed to delete the object on removal
+  uploadedBy: string;
+  uploadedAt: Timestamp;
+}
+```
+Internal only — admins log these while walking the venue; never coordinator- or public-facing. `statusHistory[0]` is always the OPEN entry written at creation, so age and "reported on X, fixed on Y" both read off the same array with no separate creation timestamp logic. Reopening (`FIXED_PENDING_CHECK` or `CLOSED` → `OPEN`) appends a new `OPEN` entry rather than truncating history — the trail stays append-only.
+
 ## Key derivations
 
 ### Registration gating by reconciliation
@@ -319,15 +371,24 @@ match /camps/{campId}/participants/{participantId} {
 ```
 A leader can read participants only within their own camp and own sub-group. For `list`, Firestore requires the query itself to filter on `subGroupId` for the rule to provably hold — an unscoped query is rejected outright. No leader-facing list UI consumes this yet (Day C only ships the registration form); this is foundation for a future leader view, same pattern as shipping role detection (Day A) ahead of the admin leader-management UI (Day B). `create` stays `if false` for everyone, including leaders — all participant writes go through Cloud Functions.
 
+### `tickets` — admin-only, all operations
+```
+match /camps/{campId}/tickets/{ticketId} {
+  allow read, write: if isAdmin();
+}
+```
+No coordinator/leader access, no public access — facility issues are an internal ops concern only. Mirrors `rooms`' admin-only shape rather than `participants`'/`paymentBatches`' leader-scoped read rules, since there's no leader-facing use case to carve out.
+
 All other rules unchanged from prior spec.
 
-## Firebase Storage — batch receipts
+## Firebase Storage — image attachments
 
-Batch receipt images (MoMo/cash handover screenshots) live in Firebase Storage, not Firestore — only the download URL + metadata are stored on the batch doc (`receiptImageUrls`, above).
+Both batch receipts and ticket photos live in Firebase Storage, not Firestore — only the download URL + metadata are stored on the owning doc (`receiptImageUrls` / `imageUrls`, above). One shared client-side implementation handles both: `src/lib/imageUpload.ts` (compress, upload/progress, delete) and `src/components/ImageAttachments.tsx` (thumbnail grid, retry, lightbox, remove) — a single upload path, not two diverging ones.
 
-Path convention:
+Path convention (folder mirrors the doc's own path):
 ```
 camps/{campId}/batches/{batchId}/receipts/{fileName}
+camps/{campId}/tickets/{ticketId}/images/{fileName}
 ```
 
 `storage.rules` mirrors the `isAdmin()` pattern from `firestore.rules` via a cross-service `firestore.exists()` call (Storage rules have no admin registry of their own):
@@ -339,8 +400,18 @@ match /camps/{campId}/batches/{batchId}/receipts/{fileName} {
       && request.resource.contentType.matches('image/.*');
   allow delete: if isAdmin();
 }
+
+match /camps/{campId}/tickets/{ticketId}/images/{fileName} {
+  allow read: if isAdmin();
+  allow create: if isAdmin()
+      && request.resource.size < 10 * 1024 * 1024
+      && request.resource.contentType.matches('image/.*');
+  allow delete: if isAdmin();
+}
 ```
-Financial records — same admin-only boundary as `paymentBatches`. Not public, not coordinator/leader-accessible. Everything outside this path is denied by default.
+Both admin-only, matching their Firestore collections (`paymentBatches` — financial records; `tickets` — internal ops). Not public, not coordinator/leader-accessible. Everything outside these paths is denied by default.
+
+**Note for later:** if a facilities-facing view is ever added, ticket images would need their own read rule (facilities isn't `isAdmin()`) — the path is already scoped per-camp/per-ticket so that's a rule change, not a data migration. Not built now; v1 has no facilities-facing surface at all.
 
 ## CSV formats unchanged
 Roster: `participantId, fullName, phone, roomTypePreference, feeOwed, amountPaid`
