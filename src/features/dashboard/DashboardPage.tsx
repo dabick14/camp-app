@@ -11,6 +11,8 @@ import { PageContainer } from '@/components/ui/page-container'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
+import { ReportButton } from '@/features/reports/components/ReportButton'
+import { generateRegistrationCountsReport } from '@/features/reports/generators'
 
 function BigMetric({ label, value, sub, warn, accent, skeleton }: {
   label: string; value: number; sub?: string; warn?: boolean; accent?: boolean; skeleton?: boolean
@@ -118,6 +120,11 @@ export function DashboardPage() {
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [active, subGroups])
 
+  const registrationReportText = useMemo(() => generateRegistrationCountsReport(
+    camp?.name ?? 'Camp',
+    bySubGroup.map((row) => ({ name: row.name, registered: row.registered })),
+  ), [camp?.name, bySubGroup])
+
   // ─── By super-group (lazy — only computed after first visit to that tab) ────
   const bySuperGroup = useMemo(() => {
     if (!seenSuperGroup) return null
@@ -210,12 +217,15 @@ export function DashboardPage() {
   return (
     <PageContainer>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Dashboard</PageTitle>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportButton label="Registration report" reportText={registrationReportText} />
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {loading && <PageLoading />}
