@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Mirrors the isAdmin() pattern in firestore.rules — cross-service call
+    // into the Firestore admins collection, since Storage has no equivalent
+    // of its own admin registry.
+    function isAdmin() {
+      return request.auth != null
+          && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    // Batch receipt screenshots (MoMo/cash handover proof) — financial
+    // records. Admin-only: not public, not coordinator-accessible, same as
+    // paymentBatches in firestore.rules.
+    match /camps/{campId}/batches/{batchId}/receipts/{fileName} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
+    // Everything else is denied by default (no matching rule = deny).
+  }
+}

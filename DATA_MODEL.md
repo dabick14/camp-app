@@ -235,8 +235,16 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   varianceNote?: string;           // required when varianceAcknowledged: true
   reopenedAt?: Timestamp;          // set when batch is explicitly reopened
   reopenedBy?: string;
+  receiptImageUrls?: BatchReceipt[]; // MoMo/cash handover screenshots, for audit/reference — see Storage section
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+interface BatchReceipt {
+  url: string;          // download URL
+  storagePath: string;  // Storage object path — needed to delete the object on removal
+  uploadedBy: string;
+  uploadedAt: Timestamp;
 }
 ```
 
@@ -312,6 +320,27 @@ match /camps/{campId}/participants/{participantId} {
 A leader can read participants only within their own camp and own sub-group. For `list`, Firestore requires the query itself to filter on `subGroupId` for the rule to provably hold — an unscoped query is rejected outright. No leader-facing list UI consumes this yet (Day C only ships the registration form); this is foundation for a future leader view, same pattern as shipping role detection (Day A) ahead of the admin leader-management UI (Day B). `create` stays `if false` for everyone, including leaders — all participant writes go through Cloud Functions.
 
 All other rules unchanged from prior spec.
+
+## Firebase Storage — batch receipts
+
+Batch receipt images (MoMo/cash handover screenshots) live in Firebase Storage, not Firestore — only the download URL + metadata are stored on the batch doc (`receiptImageUrls`, above).
+
+Path convention:
+```
+camps/{campId}/batches/{batchId}/receipts/{fileName}
+```
+
+`storage.rules` mirrors the `isAdmin()` pattern from `firestore.rules` via a cross-service `firestore.exists()` call (Storage rules have no admin registry of their own):
+```
+match /camps/{campId}/batches/{batchId}/receipts/{fileName} {
+  allow read: if isAdmin();
+  allow create: if isAdmin()
+      && request.resource.size < 10 * 1024 * 1024
+      && request.resource.contentType.matches('image/.*');
+  allow delete: if isAdmin();
+}
+```
+Financial records — same admin-only boundary as `paymentBatches`. Not public, not coordinator/leader-accessible. Everything outside this path is denied by default.
 
 ## CSV formats unchanged
 Roster: `participantId, fullName, phone, roomTypePreference, feeOwed, amountPaid`
