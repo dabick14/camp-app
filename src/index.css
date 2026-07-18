@@ -27,6 +27,8 @@
     --color-status-pending-bg: var(--status-pending-bg);
     --color-status-waived: var(--status-waived);
     --color-status-waived-bg: var(--status-waived-bg);
+    --color-status-info: var(--status-info);
+    --color-status-info-bg: var(--status-info-bg);
 
     /* ── shadcn/ui color mappings ─────────────────────────── */
     --color-sidebar-ring: var(--sidebar-ring);
@@ -119,6 +121,9 @@
     --status-pending-bg:  #FBEAE5;
     --status-waived:      #6B6560;
     --status-waived-bg:   #F0EEEC;
+    /* Neutral/blue — "in progress", not money-related (ticket Reported state) */
+    --status-info:        #2563A6;
+    --status-info-bg:     #E5EEF6;
 
     /* ── Chart ────────────────────────────────────────────── */
     --chart-1: oklch(0.434 0.113 12);

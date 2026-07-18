@@ -24,6 +24,7 @@ const badgeVariants = cva(
         partial: "bg-[var(--status-partial-bg)] text-[var(--status-partial)] border-transparent",
         pending: "bg-[var(--status-pending-bg)] text-[var(--status-pending)] border-transparent",
         waived:  "bg-[var(--status-waived-bg)]  text-[var(--status-waived)]  border-transparent",
+        info:    "bg-[var(--status-info-bg)]    text-[var(--status-info)]    border-transparent",
       },
     },
     defaultVariants: {

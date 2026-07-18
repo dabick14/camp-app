@@ -24,3 +24,16 @@ export function formatDateRange(start: Timestamp, end: Timestamp): string {
   })
   return `${fmt.format(start.toDate())} – ${fmt.format(end.toDate())}`
 }
+
+// Coarse relative age ("just now" / "3h ago" / "5d ago") for admin-facing
+// lists where the exact time matters less than "how stale is this."
+export function formatAge(ts: Timestamp): string {
+  const ms = Date.now() - ts.toDate().getTime()
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}

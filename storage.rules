@@ -21,6 +21,19 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Facility ticket photos (the issue itself, or proof-of-fix) — internal
+    // ops only, admin-only, same boundary as the tickets collection in
+    // firestore.rules. Path is scoped per-camp/per-ticket so a future
+    // facilities-facing read rule (not built now) would be a rule change
+    // here, not a data migration.
+    match /camps/{campId}/tickets/{ticketId}/images/{fileName} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+          && request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
     // Everything else is denied by default (no matching rule = deny).
   }
 }
