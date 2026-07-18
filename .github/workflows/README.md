@@ -64,6 +64,15 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   start with `admin` and narrow later if desired, same as the other roles
   on this list were discovered by hitting the missing-permission error
   rather than guessing up front.
+- **One-time, separate from IAM roles:** the Secret Manager API itself must
+  be enabled on the GCP project before `secretmanager.admin` does anything
+  useful — a role grants permissions *within* an API, it doesn't turn the
+  API on. This surfaces as `Permissions denied enabling
+  secretmanager.googleapis.com` even with the role correctly granted. Fix,
+  run once by a project owner (not the CI service account):
+  ```bash
+  gcloud services enable secretmanager.googleapis.com --project=<PROJECT_ID>
+  ```
 - These functions are Gen 2 (Cloud Run-backed under the hood). If a future
   deploy fails on an Artifact Registry permission instead, that's the next
   layer down — grant `roles/artifactregistry.writer` on the `gcf-artifacts`
