@@ -12,7 +12,7 @@ import {
   type FieldValue,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Camp, SuperGroup } from '../types'
+import type { Camp, SmsSettings, SuperGroup } from '../types'
 
 type CampInput = Omit<Camp, 'id' | 'createdAt' | 'createdBy' | 'updatedAt' | 'updatedBy'>
 
@@ -73,6 +73,22 @@ export async function saveSuperGroups(
 ): Promise<void> {
   await updateDoc(doc(db, 'camps', campId), {
     superGroups,
+    updatedAt: Timestamp.now(),
+    updatedBy: uid,
+  })
+}
+
+export async function saveSmsSettings(
+  campId: string,
+  smsSettings: SmsSettings,
+  uid: string,
+): Promise<void> {
+  // stripUndefined normally runs on the top-level update payload only —
+  // smsSettings is nested one level in (a value, not spread), so an
+  // undefined field inside it would slip past that and hit Firestore's
+  // "Unsupported field value: undefined" error directly. Strip here too.
+  await updateDoc(doc(db, 'camps', campId), {
+    smsSettings: stripUndefined(smsSettings as unknown as Record<string, unknown>),
     updatedAt: Timestamp.now(),
     updatedBy: uid,
   })

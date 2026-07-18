@@ -15,6 +15,21 @@ cd functions && npm install && cd ..
 cd functions && npm run build && cd ..
 ```
 
+**3. Cloud Function secrets** (optional — only needed to exercise SMS sending locally)
+```bash
+cp functions/.secret.local.example functions/.secret.local
+# fill in BMS_API_KEY
+```
+`functions/.secret.local` feeds `firebase-functions/params` `defineSecret()` values to the emulator. In production, secrets are set via `firebase functions:secrets:set BMS_API_KEY` (Secret Manager), never committed. Without it, `onRoomAssigned` still runs but every provider call fails — sends land in `smsLog` as `FAILED`, nothing blocks room assignment.
+
+**4. Redirect test texts to your own phone** (optional — only if you want to see real deliveries while testing locally, without texting the fake numbers on seeded participants)
+```bash
+cp functions/.env.example functions/.env   # if you haven't already, for WEB_API_KEY
+# add to functions/.env:
+echo "SMS_DEV_OVERRIDE_PHONE=233XXXXXXXXX" >> functions/.env
+```
+Every room-assignment text sent while the Functions emulator is running gets redirected to this number instead — the participant's real (fake/seeded) number is still what's validated and shown as `phone` in `smsLog`; only the actual SMS destination changes. This only ever activates under `FUNCTIONS_EMULATOR=true`, which only the emulator itself sets — leaving the var in `functions/.env` is harmless even if that file were ever accidentally deployed.
+
 ## Daily workflow
 
 **Terminal 1 — start emulators**

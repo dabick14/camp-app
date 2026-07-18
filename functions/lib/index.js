@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setPaymentClaim = exports.setLeaderActive = exports.leaderRegisterParticipant = exports.provisionLeader = exports.adminAddParticipant = void 0;
+exports.onRoomAssigned = exports.setPaymentClaim = exports.setLeaderActive = exports.leaderRegisterParticipant = exports.provisionLeader = exports.adminAddParticipant = void 0;
 const app_1 = require("firebase-admin/app");
 (0, app_1.initializeApp)();
 var adminAddParticipant_1 = require("./adminAddParticipant");
@@ -13,4 +13,6 @@ var setLeaderActive_1 = require("./setLeaderActive");
 Object.defineProperty(exports, "setLeaderActive", { enumerable: true, get: function () { return setLeaderActive_1.setLeaderActive; } });
 var setPaymentClaim_1 = require("./setPaymentClaim");
 Object.defineProperty(exports, "setPaymentClaim", { enumerable: true, get: function () { return setPaymentClaim_1.setPaymentClaim; } });
+var onRoomAssigned_1 = require("./onRoomAssigned");
+Object.defineProperty(exports, "onRoomAssigned", { enumerable: true, get: function () { return onRoomAssigned_1.onRoomAssigned; } });
 //# sourceMappingURL=index.js.map

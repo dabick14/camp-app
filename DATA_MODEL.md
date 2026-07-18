@@ -15,6 +15,7 @@
   /paymentBatches/{batchId}
   /allocations/{allocationId}
   /tickets/{ticketId}
+  /smsLog/{logId}
 ```
 
 ## Document shapes
@@ -73,10 +74,18 @@ Deactivate/reactivate goes through the `setLeaderActive` Cloud Function, not a d
   maxParticipants?: number;
   currency: string;                // "GHS" default
   registrationOpen: boolean;
+  smsSettings?: SmsSettings;       // room-assignment texts — see smsLog section
   createdAt: Timestamp;
   createdBy: string;
   updatedAt: Timestamp;
   updatedBy?: string;
+}
+
+interface SmsSettings {
+  enabled: boolean;                 // kill switch — absent/false means OFF (opt-in, no surprise sends/cost)
+  senderId?: string;                // default 'FLGALATIANS' if absent; max 11 chars per BMS
+  assignedTemplate?: string;        // default: "Hi {FirstName}, you've been assigned to Room {RoomNumber} for {CampName}. See you there!"
+  changedTemplate?: string;         // default: "Hi {FirstName}, your room for {CampName} has changed. You're now in Room {RoomNumber}."
 }
 ```
 
@@ -316,6 +325,33 @@ interface TicketImage {
 ```
 Internal only — admins log these while walking the venue; never coordinator- or public-facing. `statusHistory[0]` is always the OPEN entry written at creation, so age and "reported on X, fixed on Y" both read off the same array with no separate creation timestamp logic. Reopening (`FIXED_PENDING_CHECK` or `CLOSED` → `OPEN`) appends a new `OPEN` entry rather than truncating history — the trail stays append-only.
 
+### `camps/{campId}/smsLog/{logId}`
+```ts
+{
+  participantId: string;
+  phone: string;                   // as stored on the participant at send time
+  normalizedPhone?: string;        // local-format number actually sent to BMS (0XXXXXXXXX); absent for SKIPPED-before-normalization
+  message: string;                 // fully rendered text (placeholders already substituted)
+  trigger: 'ROOM_ASSIGNED' | 'ROOM_CHANGED' | string;  // string-extensible for future triggers (broadcasts, payment reminders)
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+  reason?: string;                 // SKIPPED only — e.g. "Missing or invalid phone number", "SMS disabled for camp (kill switch)"
+  providerResponse?: unknown;      // raw BMS response body, success or error
+  providerError?: string;          // FAILED only — short error message
+  creditLeft?: number;             // from BMS's summary.credit_left, when the provider returned one — tracks wallet balance trend/cost over time
+  triggeredBy: string;             // 'system' for trigger-initiated sends; uid/email for future manual sends
+  devRedirected?: boolean;         // true only when SMS_DEV_OVERRIDE_PHONE redirected this send under the Functions Emulator — see functions/src/sms/devOverride.ts
+  devRedirectedFrom?: string;      // the normalized number that would have received it, when devRedirected is true
+  createdAt: Timestamp;
+}
+```
+Written exclusively by Cloud Functions (Admin SDK) — `onRoomAssigned` today, and any future SMS feature (broadcasts, payment reminders) through the same `sendSms` service (`functions/src/sms/smsService.ts`). Admin-only read; no client write path.
+
+**Idempotency:** the doc id is the Firestore trigger's `event.id` for trigger-initiated sends — a duplicate delivery of the same event hits `.create()` on an existing doc, throws `ALREADY_EXISTS`, and the send is skipped before the provider is ever called. This is what makes "assignment triggers exactly one send; re-saving the same assignment sends nothing" hold even under Cloud Functions' at-least-once delivery.
+
+**Trigger rule (`onRoomAssigned`, `functions/src/onRoomAssigned.ts`):** an `onDocumentUpdated` trigger on `camps/{campId}/participants/{participantId}` compares `before.roomId` vs `after.roomId`. Fires only when `after.roomId` is set AND differs from `before.roomId` — a no-op resave (unchanged `roomId`) or an unassign (`roomId` cleared) does not fire. `ROOM_ASSIGNED` when `before.roomId` was empty, `ROOM_CHANGED` when it held a different room. Assignment always happens first (client-side transaction in `participantService.ts`) — the trigger only fires after that write commits, so an SMS failure can never block or roll back rooming.
+
+**Phone format:** BMS Africa (mnotify) accepts Ghana local format on `/sms/quick` requests — `0XXXXXXXXX`, not `+233...` or `233...` (see `functions/src/sms/normalizePhone.ts`). Participants are stored as `+233XXXXXXXXX`; invalid/unparseable numbers are logged `SKIPPED`, never block the assignment.
+
 ## Key derivations
 
 ### Registration gating by reconciliation
@@ -410,6 +446,15 @@ match /camps/{campId}/tickets/{ticketId}/images/{fileName} {
 }
 ```
 Both admin-only, matching their Firestore collections (`paymentBatches` — financial records; `tickets` — internal ops). Not public, not coordinator/leader-accessible. Everything outside these paths is denied by default.
+
+### `smsLog` — admin read-only, no client writes
+```
+match /camps/{campId}/smsLog/{logId} {
+  allow read: if isAdmin();
+  allow write: if false;
+}
+```
+Even admins cannot write directly — every entry is a byproduct of `sendSms()` running under the Admin SDK, which bypasses rules entirely. `write: if false` closes off any direct-client write path, matching the "financial/audit record" treatment given to `allocations`.
 
 **Note for later:** if a facilities-facing view is ever added, ticket images would need their own read rule (facilities isn't `isAdmin()`) — the path is already scoped per-camp/per-ticket so that's a rule change, not a data migration. Not built now; v1 has no facilities-facing surface at all.
 

@@ -73,6 +73,14 @@ service cloud.firestore {
         allow read, write: if isAdmin();
       }
 
+      // SMS send log — admin-read only. Written exclusively by the
+      // onRoomAssigned Cloud Function (Admin SDK, bypasses rules); no direct
+      // client write path exists, including for admins.
+      match /smsLog/{logId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+
       match /paymentBatches/{batchId} {
         // Admin full access.
         allow read, write: if isAdmin();

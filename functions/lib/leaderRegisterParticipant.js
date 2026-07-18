@@ -7,7 +7,7 @@ const firestore_1 = require("firebase-admin/firestore");
 // protocol, and `request.auth` is verified server-side by the platform
 // before the handler ever runs (no manual Bearer-token parsing needed,
 // and no way to forge it the way a raw HTTP body can be tampered with).
-exports.leaderRegisterParticipant = (0, https_1.onCall)(async (request) => {
+exports.leaderRegisterParticipant = (0, https_1.onCall)({ enforceAppCheck: true }, async (request) => {
     var _a, _b, _c, _d;
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Sign in required.');

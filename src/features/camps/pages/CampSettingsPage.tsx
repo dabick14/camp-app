@@ -10,8 +10,9 @@ import { RoomTypesEditor } from '@/features/rooms/components/RoomTypesEditor'
 import { CampForm } from '../components/CampForm'
 import { SubGroupsEditor } from '../components/SubGroupsEditor'
 import { SuperGroupsEditor } from '../components/SuperGroupsEditor'
+import { SmsSettingsEditor } from '../components/SmsSettingsEditor'
 import { getCamp, updateCamp } from '../services/campService'
-import type { Camp, CampFormValues, SuperGroup } from '../types'
+import type { Camp, CampFormValues, SmsSettings, SuperGroup } from '../types'
 import { PageTitle } from '@/components/ui/page-title'
 
 const SECTIONS = [
@@ -19,6 +20,7 @@ const SECTIONS = [
   { id: 'super-groups',  label: 'Super-groups' },
   { id: 'sub-groups',    label: 'Sub-groups' },
   { id: 'room-types',    label: 'Room types' },
+  { id: 'sms',           label: 'SMS' },
 ] as const
 
 type SectionId = typeof SECTIONS[number]['id']
@@ -168,6 +170,13 @@ export function CampSettingsPage() {
           )}
           {section === 'room-types' && (
             <RoomTypesEditor campId={id!} currency={camp.currency ?? 'GHS'} />
+          )}
+          {section === 'sms' && (
+            <SmsSettingsEditor
+              campId={id!}
+              smsSettings={camp.smsSettings}
+              onChange={(updated: SmsSettings) => setCamp({ ...camp, smsSettings: updated })}
+            />
           )}
         </div>
       </div>
