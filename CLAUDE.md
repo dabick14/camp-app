@@ -137,6 +137,13 @@ Run `git branch` and `git status`. Then decide:
 
 **"Radically differs" means:** different feature area, different data model concern, or different bug — not just a different file. Renaming strings and fixing a payment bug are different concerns; they go on different branches.
 
+### Sync check — do this before touching any code
+After the branch check, make sure the local tree is not stale:
+
+1. **Pull main:** `git fetch origin && git merge origin/main` (or `git pull` if already on main). If there are new commits, review what changed before continuing.
+2. **Rebase the feature branch onto main:** if you're on a feature branch, `git rebase origin/main` to pick up any main updates. Resolve conflicts, then continue. Do not start or continue work on a branch that has diverged from main without rebasing first.
+3. **Never skip this when resuming a session after a break** — another PR may have merged while you were away, and working on stale code causes needless merge conflicts later.
+
 ### Branch naming
 ```
 feature/<short-noun-phrase>   # new capability
