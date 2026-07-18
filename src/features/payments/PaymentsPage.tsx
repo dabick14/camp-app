@@ -15,6 +15,8 @@ import type { SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { derivePaymentState } from '@/features/participants/types'
 import { formatMoney } from '@/lib/formatMoney'
+import { ReportButton } from '@/features/reports/components/ReportButton'
+import { generatePaymentsExpectedReport } from '@/features/reports/generators'
 import { listBatches } from './services/batchService'
 import { hasUnreconciledBatch } from './types'
 import type { PaymentBatch } from './types'
@@ -146,12 +148,23 @@ export function PaymentsPage() {
     return batches.filter((b) => b.subGroupId === sgFilter)
   }, [batches, sgFilter])
 
+  const paymentsReportText = useMemo(() => generatePaymentsExpectedReport(
+    camp?.name ?? 'Camp',
+    currency,
+    summary.map((row) => ({
+      name: row.name,
+      cashReceived: row.totalCashReceived,
+      outstanding: row.totalExpected - row.totalConfirmed,
+    })),
+  ), [camp?.name, currency, summary])
+
   return (
     <PageContainer>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Payments</PageTitle>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportButton label="Payments report" reportText={paymentsReportText} />
           <Button
             variant="outline"
             size="sm"
