@@ -78,6 +78,51 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   layer down — grant `roles/artifactregistry.writer` on the `gcf-artifacts`
   repo when/if that actually happens, rather than pre-granting it now.
 
+### First Eventarc-triggered function (Firestore/RTDB/PubSub triggers)
+
+Every function up to `onRoomAssigned` was `onCall`/`onRequest` (plain HTTP,
+Gen 2 but not Eventarc-backed). The first time a project deploys a
+*Firestore-triggered* (or any Eventarc-backed) function, two more one-time
+things are needed on top of everything above — neither is about the deploy
+service account's own roles; both grant permissions to *other*,
+Google-managed service agents that Eventarc itself depends on.
+
+1. **IAM bindings for the Pub/Sub and default compute service agents.**
+   Firebase's deploy will detect these are missing and print the exact
+   commands to run — same self-diagnosing pattern as the roles above, no
+   guessing required:
+   ```bash
+   gcloud projects add-iam-policy-binding <PROJECT_ID> \
+     --member="serviceAccount:service-<PROJECT_NUMBER>@gcp-sa-pubsub.iam.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountTokenCreator"
+   gcloud projects add-iam-policy-binding <PROJECT_ID> \
+     --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+     --role="roles/run.invoker"
+   gcloud projects add-iam-policy-binding <PROJECT_ID> \
+     --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+     --role="roles/eventarc.eventReceiver"
+   ```
+   These have to be run by a project owner — the deploy SA doesn't have
+   `resourcemanager.projects.setIamPolicy` and isn't meant to.
+
+2. **IAM propagation delay, first use only.** Even with the bindings above
+   in place, the very first Eventarc trigger deploy on a project fails with:
+   ```
+   HTTP Error: 400, Validation failed for trigger ...: Permission denied
+   while using the Eventarc Service Agent. If you recently started to use
+   Eventarc, it may take a few minutes before all necessary permissions are
+   propagated to the Service Agent... Since this is your first time using
+   2nd gen functions, we need a little bit longer to finish setting
+   everything up. Retry the deployment in a few minutes.
+   ```
+   This is expected, not a misconfiguration — wait ~3-5 minutes and re-run
+   the workflow (`workflow_dispatch`, since a plain retry-push isn't always
+   convenient). It resolved on the very next attempt here.
+
+Both of these are one-time, project-level setup. Any *future* Firestore/RTDB/
+PubSub-triggered function added to this codebase deploys straight through —
+this section won't need revisiting unless deploying to a brand new project.
+
 ### Vite build-time env vars (used by `deploy-hosting` only)
 
 These are baked into the frontend bundle at build time. Use production values, not local dev values.
