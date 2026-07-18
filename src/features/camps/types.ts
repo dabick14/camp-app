@@ -9,6 +9,15 @@ export interface SuperGroup {
   name: string
 }
 
+// Room-assignment SMS config. Absent/enabled:false means OFF — opt-in, no
+// surprise sends or cost on camps that haven't configured it.
+export interface SmsSettings {
+  enabled: boolean
+  senderId?: string          // default 'FLGALATIANS' if absent; max 11 chars per BMS
+  assignedTemplate?: string
+  changedTemplate?: string
+}
+
 export interface Camp {
   id: string
   name: string
@@ -23,6 +32,7 @@ export interface Camp {
   currency: string
   registrationOpen: boolean
   superGroups?: SuperGroup[]    // optional per-camp rollup containers
+  smsSettings?: SmsSettings
   createdAt: Timestamp
   createdBy: string
   updatedAt: Timestamp

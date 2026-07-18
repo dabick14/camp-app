@@ -23,6 +23,8 @@ import {
   voidAllocation,
 } from '@/features/payments/services/allocationService'
 import type { Allocation } from '@/features/payments/types'
+import { listSmsLogForParticipant } from '@/features/sms/services/smsLogService'
+import type { SmsLogEntry } from '@/features/sms/types'
 import {
   cancelRegistration,
   restoreRegistration,
@@ -134,6 +136,16 @@ export function DetailDrawer({
     if (participant) loadAllocations()
     else setAllocations([])
   }, [participant, loadAllocations])
+
+  // ─── room-text send log ─────────────────────────────────────────────────────
+  const [smsLog, setSmsLog] = useState<SmsLogEntry[]>([])
+
+  useEffect(() => {
+    if (!campId || !participant) { setSmsLog([]); return }
+    listSmsLogForParticipant(campId, participant.id).then(setSmsLog).catch(() => setSmsLog([]))
+  }, [campId, participant])
+
+  const latestRoomSms = smsLog.find((e) => e.trigger === 'ROOM_ASSIGNED' || e.trigger === 'ROOM_CHANGED')
 
   async function handleVoidAllocation() {
     if (!voidTarget || !campId || !voidReason.trim()) return
@@ -634,6 +646,20 @@ export function DetailDrawer({
                       {p.roomAssignedBy && <Row label="Assigned by" value={p.roomAssignedBy} />}
                       {p.checkedInAt && <Row label="Checked in at" value={fmtTs(p.checkedInAt)} />}
                       {p.checkedInBy && <Row label="Checked in by" value={p.checkedInBy} />}
+                      <Row
+                        label="Room text"
+                        value={
+                          !latestRoomSms
+                            ? 'Not sent yet'
+                            : latestRoomSms.status === 'SENT'
+                            ? `Sent ${fmtTs(latestRoomSms.createdAt)}`
+                            : latestRoomSms.status === 'FAILED'
+                            ? <span className="text-destructive">Failed — {latestRoomSms.providerError ?? 'unknown error'}</span>
+                            : latestRoomSms.status === 'SKIPPED'
+                            ? <span className="text-muted-foreground">Skipped — {latestRoomSms.reason ?? 'unknown reason'}</span>
+                            : 'Pending'
+                        }
+                      />
 
                       <div className="flex flex-wrap gap-2 pt-1">
                         {/* Change Room button */}

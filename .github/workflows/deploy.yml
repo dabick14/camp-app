@@ -102,6 +102,14 @@ jobs:
           WEB_API_KEY: ${{ secrets.WEB_API_KEY }}
         run: echo "WEB_API_KEY=$WEB_API_KEY" > functions/.env
 
+      - name: Set BMS_API_KEY secret (Secret Manager)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+          BMS_API_KEY: ${{ secrets.BMS_API_KEY }}
+        run: |
+          printf '%s' "$BMS_API_KEY" | firebase functions:secrets:set BMS_API_KEY \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" --force --data-file -
+
       - name: Deploy Cloud Functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json

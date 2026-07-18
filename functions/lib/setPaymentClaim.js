@@ -15,7 +15,7 @@ const firestore_1 = require("firebase-admin/firestore");
  * A crafted request with a foreign participantId is rejected if that participant
  * belongs to a different sub-group.
  */
-exports.setPaymentClaim = (0, https_1.onCall)(async (request) => {
+exports.setPaymentClaim = (0, https_1.onCall)({ enforceAppCheck: true }, async (request) => {
     var _a, _b;
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Sign in required.');
@@ -47,6 +47,11 @@ exports.setPaymentClaim = (0, https_1.onCall)(async (request) => {
     // exists in this camp.
     if (participant.subGroupId !== subGroupId) {
         throw new https_1.HttpsError('permission-denied', 'Participant does not belong to your sub-group');
+    }
+    // Confirmation lock: once reconcileAndConfirm has set confirmedBatchId, the
+    // claim is permanently locked. Un-confirming is a Phase 2 admin-only concern.
+    if (participant.confirmedBatchId) {
+        throw new https_1.HttpsError('failed-precondition', 'This payment has been confirmed and can no longer be changed.');
     }
     const now = firestore_1.FieldValue.serverTimestamp();
     if (claimed) {

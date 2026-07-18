@@ -44,6 +44,8 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   --member="serviceAccount:<SA_EMAIL>" --role="roles/serviceusage.serviceUsageConsumer"
 gcloud projects add-iam-policy-binding <PROJECT_ID> \
   --member="serviceAccount:<SA_EMAIL>" --role="roles/firebasehosting.admin"
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<SA_EMAIL>" --role="roles/secretmanager.admin"
 ```
 
 - `serviceusage.serviceUsageConsumer` — without it, deploy fails checking
@@ -53,6 +55,15 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   fails with `Permission 'cloudfunctions.functions.list' denied` (or
   `.create`/`.update`), because `Cloud Functions Developer` alone isn't
   enough for a CI identity to manage functions end-to-end.
+- `secretmanager.admin` — needed by the `firebase functions:secrets:set`
+  step (see below). It has to create the secret on first run, add new
+  versions on every run, and grant the function's runtime service account
+  `secretAccessor` on it (`--force` does the auto-grant, but the CI identity
+  still needs permission to make that grant). Narrower roles exist
+  (`secretVersionManager` + `securityAdmin`) but haven't been tried here —
+  start with `admin` and narrow later if desired, same as the other roles
+  on this list were discovered by hitting the missing-permission error
+  rather than guessing up front.
 - These functions are Gen 2 (Cloud Run-backed under the hood). If a future
   deploy fails on an Artifact Registry permission instead, that's the next
   layer down — grant `roles/artifactregistry.writer` on the `gcf-artifacts`
@@ -81,6 +92,14 @@ Written to `functions/.env` on the runner right before deploy (that file is giti
 | Secret | Value |
 |---|---|
 | `WEB_API_KEY` | Same value as `VITE_FIREBASE_API_KEY` above — Firebase Console → Project Settings → General → Web API Key. Used by `provisionLeader` to trigger Identity Toolkit's password-reset email. |
+
+### Cloud Functions secrets (Secret Manager — used by `deploy-functions` only)
+
+Unlike the plain env vars above, these are pushed into **Secret Manager** via `firebase functions:secrets:set --data-file -` right before deploy (see the `Set BMS_API_KEY secret` step) — the value never lands in a file on the runner, and only functions that declare it in their `secrets: [...]` array (via `firebase-functions/params`'s `defineSecret`) can read it at runtime. This is the preferred path for any *real* third-party API key (one with actual spend/access) — plain `functions/.env` stays reserved for lower-sensitivity values like `WEB_API_KEY` above. Future integrations (e.g. Resend) should follow this same pattern: one `defineSecret()` in code, one GitHub secret, one `firebase functions:secrets:set` step.
+
+| Secret | Value |
+|---|---|
+| `BMS_API_KEY` | BMS Africa (mnotify) SMS API key — https://developer.bms.africa. Used by `onRoomAssigned` to send room-assignment texts. |
 
 ---
 
