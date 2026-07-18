@@ -18,6 +18,14 @@ export interface Allocation {
 }
 export type BatchStatus = 'OPEN' | 'RECONCILED'
 
+/** A single attached receipt image (MoMo/cash handover screenshot) for a batch. */
+export interface BatchReceipt {
+  url: string          // download URL
+  storagePath: string  // Storage object path, needed to delete the object on removal
+  uploadedBy: string
+  uploadedAt: Timestamp
+}
+
 export interface PaymentBatch {
   id: string
   referenceCode: string
@@ -35,6 +43,7 @@ export interface PaymentBatch {
   varianceNote?: string
   reopenedAt?: Timestamp
   reopenedBy?: string
+  receiptImageUrls?: BatchReceipt[]
   createdAt: Timestamp
   updatedAt: Timestamp
 }

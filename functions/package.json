@@ -5,7 +5,7 @@
     "build:watch": "tsc --watch",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "npx firebase-tools@latest emulators:exec --only firestore \"vitest run\""
+    "test": "npx firebase-tools@latest emulators:exec --only firestore,storage \"vitest run\""
   },
   "engines": {
     "node": "20"

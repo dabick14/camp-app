@@ -181,6 +181,7 @@ Batch detail page:
 - Actions: Download Roster, Upload Allocations (legacy), **Reconcile & Confirm** (enabled only on clean match) / **Reconcile with Variance** (always when OPEN) / Reopen (when RECONCILED)
 - Reconciliation panel: claimed-but-unconfirmed participants list, Σ feeOwed, vs received, Match/Short/Over
 - Legacy allocations list with void buttons
+- **Receipts**: attached MoMo/cash handover screenshots (see DATA_MODEL.md — Firebase Storage). Visible regardless of batch status, for audit/reference lookup later. Purely evidentiary — does not feed reconciliation math.
 
 ## Out of v1 scope
 - Payment aggregator integration

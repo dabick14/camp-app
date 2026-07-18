@@ -20,6 +20,7 @@ import { reconcileAndConfirm, reconcileWithVariance, reopenBatch } from './servi
 import type { PaymentBatch } from './types'
 import { BatchStatusBadge } from './components/BatchStatusBadge'
 import { BatchForm } from './components/BatchForm'
+import { BatchReceipts } from './components/BatchReceipts'
 
 const METHOD_LABEL: Record<string, string> = {
   MOMO: 'MoMo',
@@ -531,6 +532,14 @@ export function BatchDetailPage() {
           </section>
         </>
       )}
+
+      <BatchReceipts
+        campId={campId!}
+        batchId={batchId!}
+        receipts={batch.receiptImageUrls ?? []}
+        uid={uid()}
+        onChange={loadBatch}
+      />
 
       {/* Modals */}
       {showEdit && (
