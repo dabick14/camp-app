@@ -14,6 +14,8 @@ jobs:
     outputs:
       hosting: ${{ steps.filter.outputs.hosting }}
       functions: ${{ steps.filter.outputs.functions }}
+      firestoreRules: ${{ steps.filter.outputs.firestoreRules }}
+      storageRules: ${{ steps.filter.outputs.storageRules }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -24,6 +26,11 @@ jobs:
               - '!(functions/**)'
             functions:
               - 'functions/**'
+            firestoreRules:
+              - 'firestore.rules'
+              - 'firestore.indexes.json'
+            storageRules:
+              - 'storage.rules'
 
   # ── Job 1: Hosting ────────────────────────────────────────────────────────
   deploy-hosting:
@@ -115,6 +122,68 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
         run: |
           firebase deploy --only functions \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --force
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f /tmp/firebase-sa.json
+
+  # ── Job 3: Firestore rules + indexes ────────────────────────────────────────
+  # Without this, firestore.rules changes only ever take effect in the local
+  # emulator (which reads the file straight off disk) and never reach
+  # production unless someone remembers to deploy manually. That gap is what
+  # let the tickets collection rule sit undeployed in prod after #15.
+  deploy-firestore-rules:
+    needs: filter
+    if: needs.filter.outputs.firestoreRules == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Write service account key
+        env:
+          SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: echo "$SA_KEY" > /tmp/firebase-sa.json
+
+      - name: Deploy Firestore rules and indexes
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+        run: |
+          firebase deploy --only firestore:rules,firestore:indexes \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --force
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f /tmp/firebase-sa.json
+
+  # ── Job 4: Storage rules ─────────────────────────────────────────────────────
+  deploy-storage-rules:
+    needs: filter
+    if: needs.filter.outputs.storageRules == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Write service account key
+        env:
+          SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: echo "$SA_KEY" > /tmp/firebase-sa.json
+
+      - name: Deploy Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase-sa.json
+        run: |
+          firebase deploy --only storage \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
             --force
 
