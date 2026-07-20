@@ -84,7 +84,8 @@ export function RoomsPage() {
       setRoomTypes(types)
       setRooms(roomsData)
       setTickets(ticketsData)
-    } catch {
+    } catch (err) {
+      console.error('Failed to load rooms:', err)
       setError('Failed to load rooms.')
     } finally {
       setLoading(false)
