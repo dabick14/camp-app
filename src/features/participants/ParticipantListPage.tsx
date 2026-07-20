@@ -927,7 +927,7 @@ export function ParticipantListPage() {
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                      className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
                         showCancelled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateRange } from '@/lib/dates'
 import { LogoutButton } from '@/features/auth/LogoutButton'
+import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import { listCamps } from '../services/campService'
 import type { Camp } from '../types'
 
@@ -33,6 +34,7 @@ export function CampsListPage() {
               New camp
             </Link>
           </Button>
+          <ThemeToggle />
           <LogoutButton />
         </div>
       </div>

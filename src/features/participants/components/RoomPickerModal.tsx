@@ -158,7 +158,7 @@ export function RoomPickerModal({
             Assign room for {participant.fullName} ({genderLabel})
           </DialogTitle>
           {overrideReason && (
-            <p className="text-xs text-amber-600 mt-1">
+            <p className="text-xs text-status-partial mt-1">
               Override: "{overrideReason}"
             </p>
           )}
@@ -167,8 +167,8 @@ export function RoomPickerModal({
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
           {/* Overbook confirmation banner */}
           {pendingOverbookRoom && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <p className="text-sm font-medium text-amber-800 flex items-center gap-1.5">
+            <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 space-y-2">
+              <p className="text-sm font-medium text-status-partial flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 Room {pendingOverbookRoom.number} is at capacity (
                 {pendingOverbookRoom.currentOccupancy}/{pendingOverbookRoom.capacity}). Assign anyway?
@@ -178,7 +178,7 @@ export function RoomPickerModal({
                   size="sm"
                   onClick={() => doAssign(pendingOverbookRoom)}
                   disabled={assigning}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  className="border border-status-partial/40 bg-status-partial-bg text-status-partial hover:bg-status-partial-bg/70"
                 >
                   {assigning ? 'Assigning…' : 'Yes, assign'}
                 </Button>
@@ -262,7 +262,7 @@ export function RoomPickerModal({
                             : isHardFull
                             ? 'border-border bg-muted/30 opacity-50 cursor-not-allowed'
                             : isOverbook
-                            ? 'border-amber-300 bg-amber-50 hover:bg-amber-100 cursor-pointer'
+                            ? 'border-status-partial/40 bg-status-partial-bg hover:bg-status-partial-bg/70 cursor-pointer'
                             : 'border-input bg-background hover:bg-muted cursor-pointer'
                         }`}
                       >
@@ -277,12 +277,12 @@ export function RoomPickerModal({
                           </span>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isOverbook && (
-                              <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                              <span className="rounded-full bg-status-partial-bg px-1.5 py-0.5 text-xs font-semibold text-status-partial">
                                 OVER
                               </span>
                             )}
                             {isHardFull && (
-                              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                              <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive">
                                 FULL
                               </span>
                             )}

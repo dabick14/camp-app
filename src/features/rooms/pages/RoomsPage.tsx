@@ -252,7 +252,7 @@ export function RoomsPage() {
                     <span
                       className={
                         room.currentOccupancy >= room.capacity
-                          ? 'font-medium text-amber-600'
+                          ? 'font-medium text-status-partial'
                           : 'text-muted-foreground'
                       }
                     >

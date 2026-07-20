@@ -15,7 +15,7 @@ export function ProtectedRoute({
   if (role.type === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center">
-        <span className="text-sm text-gray-500">Loading…</span>
+        <span className="text-sm text-muted-foreground">Loading…</span>
       </div>
     )
   }

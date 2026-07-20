@@ -255,7 +255,7 @@ export function AdminAddParticipantPage() {
             autoComplete="off"
           />
           {phoneDupWarning && normalizedPhone && (
-            <p className="mt-1 text-sm text-amber-700">
+            <p className="mt-1 text-sm text-status-partial">
               ⚠️ {normalizedPhone} is already registered.
             </p>
           )}
@@ -376,7 +376,7 @@ export function AdminAddParticipantPage() {
 
         {/* Soft duplicate warnings */}
         {softDup && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 text-sm text-status-partial">
             <p className="mb-2">{softDup.message}</p>
             <div className="flex gap-2">
               <Button
@@ -384,7 +384,7 @@ export function AdminAddParticipantPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => acknowledgeAndResubmit(softDup.type)}
-                className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                className="border-status-partial/40 text-status-partial hover:bg-status-partial-bg"
               >
                 Register anyway
               </Button>
@@ -393,7 +393,7 @@ export function AdminAddParticipantPage() {
                 size="sm"
                 variant="ghost"
                 onClick={() => setSoftDup(null)}
-                className="text-amber-800 hover:bg-amber-100"
+                className="text-status-partial hover:bg-status-partial-bg"
               >
                 Cancel
               </Button>

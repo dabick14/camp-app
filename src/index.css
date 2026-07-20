@@ -144,37 +144,81 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card:            oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover:            oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary:            oklch(0.60 0.110 12);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary:            oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted:            oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent:            oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input:  oklch(1 0 0 / 15%);
-    --ring:   oklch(0.60 0.110 12);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar:                    oklch(0.205 0 0);
-    --sidebar-foreground:         oklch(0.985 0 0);
-    --sidebar-primary:            oklch(0.60 0.110 12);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent:             oklch(0.269 0 0);
-    --sidebar-accent-foreground:  oklch(0.985 0 0);
-    --sidebar-border:             oklch(1 0 0 / 10%);
-    --sidebar-ring:               oklch(0.60 0.110 12);
+    /* ── Two reds — different jobs, dark-tuned (see DESIGN_SPEC.md) ─
+       Brand lightened + more saturated to stay legible/vivid on dark
+       surfaces without losing its warm/rose identity; still visibly
+       cooler + less saturated than Alert, which stays bright/hot.
+       Verified: brand H350 S64 L62 vs alert H0 S91 L71 — same ~9°
+       hue gap and "deeper/warmer vs brighter/hotter" split as light
+       mode, just shifted up in lightness. Contrast checked below.  */
+    --brand:       #DC5E73; /* dark-mode brand red, 4.91:1 on bg    */
+    --brand-hover: #C24D63; /* pressed — darker, between light/dark */
+    --brand-tint:  #3A2228; /* dark muted rose wash (active/selected)*/
+    --danger:      #f87171; /* dark-mode alert red, 6.32:1 on bg    */
+
+    /* Soft warm dark — NOT pure black (harsh w/ white text) */
+    --background: #1C1917;
+    --foreground: #F0EAE6; /* off-white, not pure white (glare) */
+
+    /* Surface sits slightly lighter than bg so cards still "lift" */
+    --card:            #242020;
+    --card-foreground: #F0EAE6;
+
+    --popover:            #242020;
+    --popover-foreground: #F0EAE6;
+
+    /* Primary = Brand Red. Dark text on the lightened brand red reads
+       cleanly (5.02:1) — white-on-red can't clear AA at this hue/chroma
+       without either flattening the red or going too dark to read as
+       "lifted" brand, so dark mode flips foreground instead of light mode's
+       white-on-deep-red. */
+    --primary:            #DC5E73;
+    --primary-foreground: #1C1613;
+
+    --secondary:            #2C2724;
+    --secondary-foreground: #F0EAE6;
+
+    --muted:            #2C2724;
+    --muted-foreground: #A9A29B; /* muted, not stark — 6.94:1 on bg */
+
+    --accent:            #2C2724;
+    --accent-foreground: #F0EAE6;
+
+    /* Destructive = Alert Red */
+    --destructive: #f87171;
+
+    --border: #3A3430; /* subtle, still visible against Surface */
+    --input:  #423B36;
+    --ring:   #DC5E73;
+
+    --radius: 0.75rem;
+
+    /* ── Status colours (dark-tuned, meaning preserved) ──────── */
+    --status-paid:        #4FBE86;
+    --status-paid-bg:     #15291F;
+    --status-partial:     #E0A73C;
+    --status-partial-bg:  #332508;
+    --status-pending:     #E08659;
+    --status-pending-bg:  #301D15;
+    --status-waived:      #B7AFA6;
+    --status-waived-bg:   #26221E;
+    --status-info:        #6FA8DC;
+    --status-info-bg:     #152233;
+
+    --chart-1: #DC5E73;
+    --chart-2: #4FBE86;
+    --chart-3: #E0A73C;
+    --chart-4: #6FA8DC;
+    --chart-5: #A9A29B;
+
+    --sidebar:                    #1C1917;
+    --sidebar-foreground:         #F0EAE6;
+    --sidebar-primary:            #DC5E73;
+    --sidebar-primary-foreground: #1C1613;
+    --sidebar-accent:             #2C2724;
+    --sidebar-accent-foreground:  #F0EAE6;
+    --sidebar-border:             #3A3430;
+    --sidebar-ring:               #DC5E73;
 }
 
 @layer base {

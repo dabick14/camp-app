@@ -151,7 +151,7 @@ export function CampForm({ defaultValues, onSubmit, submitLabel = 'Save' }: Camp
       </Field>
 
       {/* Registration open — blast-radius control */}
-      <div className="rounded-lg border-2 border-amber-200 bg-amber-50/50 px-4 py-4 dark:border-amber-700/40 dark:bg-amber-950/20">
+      <div className="rounded-lg border-2 border-status-partial/30 bg-status-partial-bg/50 px-4 py-4">
         <div className="flex items-start gap-3">
           <Switch
             id="registrationOpen"

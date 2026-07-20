@@ -58,18 +58,15 @@ function fmtTs(ts: Timestamp | undefined): string {
   })
 }
 
+const PAYMENT_BADGE_VARIANT: Record<PaymentState, 'paid' | 'partial' | 'pending' | 'waived'> = {
+  PAID: 'paid',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
+  WAIVED: 'waived',
+}
+
 function PaymentBadge({ state }: { state: PaymentState }) {
-  const styles: Record<PaymentState, string> = {
-    PAID: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    PARTIAL: 'bg-amber-50 text-amber-700 border border-amber-200',
-    PENDING: 'bg-red-50 text-red-700 border border-red-200',
-    WAIVED: 'bg-muted text-muted-foreground border border-border',
-  }
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[state]}`}>
-      {state}
-    </span>
-  )
+  return <Badge variant={PAYMENT_BADGE_VARIANT[state]}>{state}</Badge>
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -561,7 +558,7 @@ export function DetailDrawer({
                 {p.feeOwed > 0 && p.amountPaid > p.feeOwed && (
                   <Row
                     label="Credit"
-                    value={<span className="font-medium text-emerald-600">{formatMoney(p.amountPaid - p.feeOwed, currency)}</span>}
+                    value={<span className="font-medium text-status-paid">{formatMoney(p.amountPaid - p.feeOwed, currency)}</span>}
                   />
                 )}
                 {p.feeWaiverNote && (
@@ -671,7 +668,7 @@ export function DetailDrawer({
                           disabled={busy}
                           className={
                             paymentState !== 'PAID' && paymentState !== 'WAIVED'
-                              ? 'border-amber-300 text-amber-800 hover:bg-amber-50 gap-1'
+                              ? 'border-status-partial/40 text-status-partial hover:bg-status-partial-bg gap-1'
                               : 'gap-1'
                           }
                         >
@@ -762,7 +759,7 @@ export function DetailDrawer({
                           disabled={busy}
                           className={
                             paymentState !== 'PAID' && paymentState !== 'WAIVED'
-                              ? 'border-amber-300 text-amber-800 hover:bg-amber-50 gap-1'
+                              ? 'border-status-partial/40 text-status-partial hover:bg-status-partial-bg gap-1'
                               : 'gap-1'
                           }
                         >
@@ -925,7 +922,7 @@ export function DetailDrawer({
                     ))}
                   </div>
                   {p && newRoomTypeFee !== undefined && newRoomTypeFee !== p.feeOwed && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <div className="rounded-md border border-status-partial/30 bg-status-partial-bg px-3 py-2 text-sm text-status-partial">
                       Fee will change from {formatMoney(p.feeOwed, currency)} to {formatMoney(newRoomTypeFee, currency)}.
                     </div>
                   )}

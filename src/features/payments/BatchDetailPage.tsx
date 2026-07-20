@@ -171,7 +171,7 @@ function VarianceDialog({
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             The claimed participants owe a total that is{' '}
-            <span className="font-medium text-amber-700">{diffLabel}</span> of the received lump.
+            <span className="font-medium text-status-partial">{diffLabel}</span> of the received lump.
             {unconfirmedCount > 0 && (
               <>
                 {' '}The {unconfirmedCount} claimed participant{unconfirmedCount !== 1 ? 's' : ''} in{' '}
@@ -292,7 +292,7 @@ export function BatchDetailPage() {
             <h2 className="font-mono text-xl font-semibold">{batch.referenceCode}</h2>
             <BatchStatusBadge status={batch.status} />
             {batch.varianceAcknowledged && (
-              <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+              <span className="rounded-full border border-status-partial/40 bg-status-partial-bg px-2 py-0.5 text-xs text-status-partial">
                 Variance acknowledged
               </span>
             )}
@@ -307,7 +307,7 @@ export function BatchDetailPage() {
           )}
           {batch.notes && <p className="mt-0.5 text-sm text-muted-foreground">Note: {batch.notes}</p>}
           {batch.varianceNote && (
-            <p className="mt-0.5 text-sm text-amber-700">
+            <p className="mt-0.5 text-sm text-status-partial">
               Variance note: {batch.varianceNote}
             </p>
           )}
@@ -366,7 +366,7 @@ export function BatchDetailPage() {
             )}
           </div>
           {batch.status === 'OPEN' && !matches && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-status-partial">
               {diff > 0
                 ? `Over by ${formatMoney(diff, currency)} — claimed ${formatMoney(claimedSum, currency)}, received ${formatMoney(batch.amountReceived, currency)}`
                 : claimedUnconfirmed.length === 0
@@ -388,7 +388,7 @@ export function BatchDetailPage() {
           <p className="text-sm text-muted-foreground">Awaiting confirmation</p>
           {isReconciled && claimedUnconfirmed.length === 0 ? (
             <>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">✓ All confirmed</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-status-paid">✓ All confirmed</p>
               <p className="mt-0.5 text-xs text-muted-foreground">No participants awaiting confirmation</p>
             </>
           ) : (
@@ -401,33 +401,33 @@ export function BatchDetailPage() {
           )}
         </div>
         {isReconciled && !batch.varianceAcknowledged ? (
-          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-5 py-4">
+          <div className="rounded-lg border border-status-paid/40 bg-status-paid-bg px-5 py-4">
             <p className="text-sm text-muted-foreground">Confirmed</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-status-paid">
               ✓ {formatMoney(batch.amountAllocated, currency)}
             </p>
-            <p className="mt-0.5 text-xs text-emerald-600">Match — reconciled</p>
+            <p className="mt-0.5 text-xs text-status-paid">Match — reconciled</p>
           </div>
         ) : isReconciled && batch.varianceAcknowledged ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-5 py-4">
+          <div className="rounded-lg border border-status-partial/40 bg-status-partial-bg px-5 py-4">
             <p className="text-sm text-muted-foreground">Variance</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-700">
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-status-partial">
               {formatMoney(unallocated, currency)}
             </p>
-            <p className="mt-0.5 text-xs text-amber-600">Reconciled with variance · not allocated to individuals</p>
+            <p className="mt-0.5 text-xs text-status-partial">Reconciled with variance · not allocated to individuals</p>
           </div>
         ) : (
-          <div className={`rounded-lg border px-5 py-4 ${!matches ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50'}`}>
+          <div className={`rounded-lg border px-5 py-4 ${!matches ? 'border-status-partial/40 bg-status-partial-bg' : 'border-status-paid/40 bg-status-paid-bg'}`}>
             <p className="text-sm text-muted-foreground">Difference</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${!matches ? 'text-amber-700' : 'text-emerald-700'}`}>
+            <p className={`mt-1 text-2xl font-semibold tabular-nums ${!matches ? 'text-status-partial' : 'text-status-paid'}`}>
               {matches ? '✓ Match' : diff > 0 ? `+${formatMoney(diff, currency)}` : formatMoney(diff, currency)}
             </p>
             <p className="mt-0.5 text-xs">
               {matches
-                ? <span className="text-emerald-600">Ready to confirm</span>
+                ? <span className="text-status-paid">Ready to confirm</span>
                 : diff > 0
-                  ? <span className="text-amber-600">Over by {formatMoney(diff, currency)}</span>
-                  : <span className="text-amber-600">Short by {formatMoney(-diff, currency)} · blocks registration</span>
+                  ? <span className="text-status-partial">Over by {formatMoney(diff, currency)}</span>
+                  : <span className="text-status-partial">Short by {formatMoney(-diff, currency)} · blocks registration</span>
               }
             </p>
           </div>

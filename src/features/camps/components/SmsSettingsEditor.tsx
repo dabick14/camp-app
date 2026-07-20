@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getAuth } from 'firebase/auth'
 import { toast } from 'sonner'
 import { AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,18 +34,15 @@ function fmtTs(ts: SmsLogEntry['createdAt']): string {
   })
 }
 
+const SMS_STATUS_VARIANT: Record<SmsStatus, 'paid' | 'destructive' | 'secondary' | 'partial'> = {
+  SENT: 'paid',
+  FAILED: 'destructive',
+  SKIPPED: 'secondary',
+  PENDING: 'partial',
+}
+
 function StatusBadge({ status }: { status: SmsStatus }) {
-  const styles: Record<SmsStatus, string> = {
-    SENT: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    FAILED: 'bg-red-50 text-red-700 border border-red-200',
-    SKIPPED: 'bg-muted text-muted-foreground border border-border',
-    PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
-  }
-  return (
-    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  )
+  return <Badge variant={SMS_STATUS_VARIANT[status]} className="shrink-0">{status}</Badge>
 }
 
 function TemplateField({
@@ -63,7 +61,7 @@ function TemplateField({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <Label>{label}</Label>
-        <span className={`text-xs ${over ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+        <span className={`text-xs ${over ? 'text-status-partial font-medium' : 'text-muted-foreground'}`}>
           {info.length} chars · {info.segments} segment{info.segments === 1 ? '' : 's'}
           {over && ' (extra segments cost more)'}
         </span>
@@ -169,7 +167,7 @@ export function SmsSettingsEditor({
         </div>
 
         {!enabled && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 rounded-md border border-status-partial/30 bg-status-partial-bg px-3 py-2 text-xs text-status-partial">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             SMS is currently OFF for this camp. Room assignments still work as normal — no texts are sent.
           </div>
