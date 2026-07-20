@@ -13,6 +13,7 @@ import { withTimeout } from '@/lib/withTimeout'
 import { Input } from '@/components/ui/input'
 import { PageError, PageLoading } from '@/components/ui/states'
 import { LogoutButton } from '@/features/auth/LogoutButton'
+import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import { useUserRole } from '@/features/auth/UserRoleContext'
 import type { Participant } from '@/features/participants/types'
 import { getCamp } from '@/features/camps/services/campService'
@@ -216,7 +217,10 @@ export function LeaderRosterPage() {
           <h1 className="font-display text-2xl font-semibold">{camp?.name ?? '…'}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{subGroupName}</p>
         </div>
-        <LogoutButton />
+        <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
+          <LogoutButton />
+        </div>
       </div>
 
       {/* Nav */}
@@ -370,7 +374,7 @@ export function LeaderRosterPage() {
                         }`}
                       >
                         {isClaimed ? (
-                          <CheckSquare className="h-5 w-5 shrink-0 text-emerald-600" />
+                          <CheckSquare className="h-5 w-5 shrink-0 text-status-paid" />
                         ) : (
                           <Square className="h-5 w-5 shrink-0 text-muted-foreground" />
                         )}
@@ -435,7 +439,7 @@ export function LeaderRosterPage() {
                         }
                         className="flex w-full items-center gap-3 bg-status-paid-bg/60 px-4 py-3 text-left"
                       >
-                        <Lock className="h-5 w-5 shrink-0 text-emerald-600" />
+                        <Lock className="h-5 w-5 shrink-0 text-status-paid" />
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium leading-snug">{p.fullName}</span>
                           <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-status-paid-bg px-1.5 py-0.5 text-xs font-medium text-status-paid">

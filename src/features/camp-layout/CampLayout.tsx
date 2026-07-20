@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatDateRange } from '@/lib/dates'
 import { LogoutButton } from '@/features/auth/LogoutButton'
+import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import { CampDataProvider, useCampData } from './CampDataContext'
 
 const NAV_ITEMS = (base: string) => [
@@ -149,6 +150,7 @@ function CampLayoutInner() {
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
+            <ThemeToggle />
             <LogoutButton />
           </div>
         </div>

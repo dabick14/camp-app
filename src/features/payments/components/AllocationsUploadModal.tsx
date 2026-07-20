@@ -237,7 +237,7 @@ export function AllocationsUploadModal({
               {preview.valid.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <CheckCircle className="mr-1 inline h-3.5 w-3.5 text-emerald-600" />
+                    <CheckCircle className="mr-1 inline h-3.5 w-3.5 text-status-paid" />
                     Will allocate ({preview.valid.length})
                   </p>
                   <div className="max-h-48 overflow-y-auto rounded-md border text-sm">
@@ -262,7 +262,7 @@ export function AllocationsUploadModal({
                             </td>
                             <td className="px-3 py-1.5 text-right text-xs">
                               {r.overpayment > 0 && (
-                                <span className="text-amber-600">
+                                <span className="text-status-partial">
                                   +{formatMoney(r.overpayment, currency)} over
                                 </span>
                               )}
@@ -279,15 +279,15 @@ export function AllocationsUploadModal({
               {preview.errors.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-amber-600" />
+                    <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-status-partial" />
                     Skipped / errors ({preview.errors.length})
                   </p>
-                  <div className="max-h-32 overflow-y-auto rounded-md border border-amber-200 bg-amber-50 text-sm">
+                  <div className="max-h-32 overflow-y-auto rounded-md border border-status-partial/30 bg-status-partial-bg text-sm">
                     {preview.errors.map((e) => (
-                      <div key={`${e.rowNum}-${e.participantId}`} className="border-b border-amber-100 px-3 py-1.5 last:border-0">
+                      <div key={`${e.rowNum}-${e.participantId}`} className="border-b border-status-partial/20 px-3 py-1.5 last:border-0">
                         <span className="font-mono text-xs text-muted-foreground">Row {e.rowNum}</span>
                         {' '}·{' '}
-                        <span className="text-amber-800">{e.reason}</span>
+                        <span className="text-status-partial">{e.reason}</span>
                       </div>
                     ))}
                   </div>

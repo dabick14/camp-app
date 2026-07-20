@@ -36,7 +36,7 @@ export function OverridePaymentModal({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-status-partial shrink-0" />
                 Outstanding balance
               </DialogTitle>
             </DialogHeader>

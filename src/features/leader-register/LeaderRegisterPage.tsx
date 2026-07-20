@@ -19,6 +19,7 @@ import type { Camp } from '@/features/camps/types'
 import type { RoomType } from '@/features/rooms/types'
 import { useUserRole } from '@/features/auth/UserRoleContext'
 import { LogoutButton } from '@/features/auth/LogoutButton'
+import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import {
   isValidGhanaPhone,
   normalizePhone,
@@ -291,7 +292,8 @@ export function LeaderRegisterPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Registration for this camp is not currently open. Contact the camp administrator.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 flex justify-center gap-2">
+          <ThemeToggle />
           <LogoutButton />
         </div>
       </div>
@@ -306,7 +308,10 @@ export function LeaderRegisterPage() {
             <h1 className="font-display text-2xl font-semibold">{camp?.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{camp?.location}</p>
           </div>
-          <LogoutButton />
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <LogoutButton />
+          </div>
         </div>
 
         {/* Nav between leader screens — the roster stays reachable while gated */}
@@ -331,9 +336,9 @@ export function LeaderRegisterPage() {
           </Link>
         </div>
 
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-center">
-          <p className="text-lg font-medium text-amber-900">New registrations are paused</p>
-          <p className="mt-2 text-sm text-amber-800">
+        <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-4 text-center">
+          <p className="text-lg font-medium text-status-partial">New registrations are paused</p>
+          <p className="mt-2 text-sm text-status-partial">
             {role.subGroupName} has a payment batch that hasn't been fully reconciled yet, so new
             registrations are on hold until your admin reconciles it. You can still mark who has
             paid — that's how the batch gets resolved.
@@ -366,7 +371,10 @@ export function LeaderRegisterPage() {
           <h1 className="font-display text-2xl font-semibold">{camp?.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{camp?.location}</p>
         </div>
-        <LogoutButton />
+        <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
+          <LogoutButton />
+        </div>
       </div>
 
       {/* Nav between leader screens */}
@@ -530,7 +538,7 @@ export function LeaderRegisterPage() {
 
         {/* Soft duplicate warning */}
         {softDup && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 text-sm text-status-partial">
             <p className="mb-2">{softDup.message}</p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
@@ -538,7 +546,7 @@ export function LeaderRegisterPage() {
                 size="xl"
                 variant="outline"
                 onClick={acknowledgeAndResubmit}
-                className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                className="border-status-partial/40 text-status-partial hover:bg-status-partial-bg/70"
                 disabled={isSubmitting}
               >
                 Register anyway
@@ -548,7 +556,7 @@ export function LeaderRegisterPage() {
                 size="xl"
                 variant="ghost"
                 onClick={() => setSoftDup(null)}
-                className="text-amber-800 hover:bg-amber-100"
+                className="text-status-partial hover:bg-status-partial-bg/70"
               >
                 Cancel
               </Button>
