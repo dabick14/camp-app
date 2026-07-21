@@ -22,8 +22,10 @@ import type { Leader } from './types'
 import { ProvisionLeaderModal } from './components/ProvisionLeaderModal'
 import { PageTitle } from '@/components/ui/page-title'
 
-const SET_LEADER_ACTIVE_URL =
-  'https://us-central1-camp-app-119bb.cloudfunctions.net/setLeaderActive'
+// DEV-only emulator override — see AdminAddParticipantPage for why this matters.
+const SET_LEADER_ACTIVE_URL = import.meta.env.DEV
+  ? 'http://127.0.0.1:5001/camp-app-119bb/us-central1/setLeaderActive'
+  : 'https://us-central1-camp-app-119bb.cloudfunctions.net/setLeaderActive'
 
 function fmtLastLogin(ts: Timestamp | undefined): string {
   if (!ts) return 'Never'

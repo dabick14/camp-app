@@ -20,8 +20,10 @@ import {
 import type { SubGroup } from '@/features/camps/types'
 import type { Leader } from '../types'
 
-const PROVISION_LEADER_URL =
-  'https://us-central1-camp-app-119bb.cloudfunctions.net/provisionLeader'
+// DEV-only emulator override — see AdminAddParticipantPage for why this matters.
+const PROVISION_LEADER_URL = import.meta.env.DEV
+  ? 'http://127.0.0.1:5001/camp-app-119bb/us-central1/provisionLeader'
+  : 'https://us-central1-camp-app-119bb.cloudfunctions.net/provisionLeader'
 
 export function ProvisionLeaderModal({
   campId,
