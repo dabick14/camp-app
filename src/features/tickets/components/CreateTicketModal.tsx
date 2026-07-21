@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckIcon, Camera, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -184,7 +184,7 @@ export function CreateTicketModal({
           <DialogHeader>
             <DialogTitle>Add photos</DialogTitle>
           </DialogHeader>
-          <div className="pt-2">
+          <DialogBody className="pt-2">
             <p className="mb-4 text-sm text-muted-foreground">
               Ticket logged. Some photos didn't make it — attach them again, or skip and add them later.
             </p>
@@ -198,12 +198,12 @@ export function CreateTicketModal({
               emptyMessage="No photos yet."
               removeConfirmMessage="Remove this photo? This cannot be undone."
             />
-            <div className="mt-4 flex justify-end">
-              <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" onClick={() => onOpenChange(false)}>
-                Done
-              </Button>
-            </div>
-          </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button className="min-h-11 w-full sm:min-h-9 sm:w-auto" onClick={() => onOpenChange(false)}>
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     )
@@ -216,7 +216,8 @@ export function CreateTicketModal({
           <DialogTitle>Log an issue</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        <form onSubmit={handleSubmit} className="contents">
+        <DialogBody className="space-y-4 pt-2">
           <div className="space-y-1.5">
             <Label>Room</Label>
             {selectedRoom && !initialRoomId ? (
@@ -330,15 +331,16 @@ export function CreateTicketModal({
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
+        </DialogBody>
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving} className="min-h-11 whitespace-normal sm:min-h-9 sm:whitespace-nowrap">
-              {saving ? savingLabel : 'Log issue'}
-            </Button>
-          </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving} className="min-h-11 whitespace-normal sm:min-h-9 sm:whitespace-nowrap">
+            {saving ? savingLabel : 'Log issue'}
+          </Button>
+        </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -4,7 +4,7 @@ import { getAuth } from 'firebase/auth'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/formatMoney'
@@ -179,7 +179,7 @@ export function AllocationsUploadModal({
           <DialogTitle>Upload Allocations — {batch.referenceCode}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <DialogBody className="space-y-4">
           {/* File picker */}
           <div>
             <p className="mb-2 text-sm text-muted-foreground">
@@ -295,7 +295,7 @@ export function AllocationsUploadModal({
               )}
             </div>
           )}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={committing}>

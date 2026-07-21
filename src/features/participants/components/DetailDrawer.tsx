@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -900,7 +901,7 @@ export function DetailDrawer({
                 <DialogHeader>
                   <DialogTitle>Change room type preference</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
+                <DialogBody className="space-y-3">
                   <p className="text-sm text-muted-foreground">Changing the room type will update the fee owed.</p>
                   <div className="space-y-1.5 max-h-64 overflow-y-auto">
                     {roomTypes.map((rt) => (
@@ -926,7 +927,7 @@ export function DetailDrawer({
                       Fee will change from {formatMoney(p.feeOwed, currency)} to {formatMoney(newRoomTypeFee, currency)}.
                     </div>
                   )}
-                </div>
+                </DialogBody>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setShowRTModal(false)}>Cancel</Button>
                   <Button

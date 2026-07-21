@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { copyToClipboard } from '@/lib/clipboard'
 
 interface ReportButtonProps {
@@ -48,11 +48,13 @@ export function ReportButton({ label, reportText }: ReportButtonProps) {
             <DialogTitle>{label}</DialogTitle>
           </DialogHeader>
 
-          <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 font-sans text-sm">
-            {reportText}
-          </pre>
+          <DialogBody>
+            <pre className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 font-sans text-sm">
+              {reportText}
+            </pre>
+          </DialogBody>
 
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button
               variant="outline"
               className="min-h-11 sm:min-h-9"
@@ -63,7 +65,7 @@ export function ReportButton({ label, reportText }: ReportButtonProps) {
             <Button className="min-h-11 sm:min-h-9" onClick={handleCopy} disabled={copying}>
               {copying ? 'Copying…' : 'Copy report'}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

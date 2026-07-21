@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import Papa from 'papaparse'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { auth } from '@/lib/firebase'
 import { bulkCreateRooms } from '../services/roomService'
 import type { Room, RoomType } from '../types'
@@ -28,6 +29,10 @@ interface ParseResult {
   errors: ErrorRow[]
 }
 
+// On-screen previews cap here — the full list would otherwise push the
+// footer buttons off-screen with a large file (see participants ImportCsvModal).
+const PREVIEW_LIMIT = 10
+
 interface CsvImportModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -45,19 +50,19 @@ export function CsvImportModal({
   existingRooms,
   onImported,
 }: CsvImportModalProps) {
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [result, setResult] = useState<ParseResult | null>(null)
   const [importing, setImporting] = useState(false)
 
   function reset() {
+    setSelectedFile(null)
     setResult(null)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  function handleFile(file: File | null) {
     setResult(null)
+    setSelectedFile(file)
+    if (!file) return
 
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -159,65 +164,79 @@ export function CsvImportModal({
           <DialogTitle>Import rooms from CSV</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <DialogBody className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
             Expected columns: <code className="rounded bg-muted px-1 text-xs">number, type, gender, capacity, notes</code>
             <br />
             <span className="text-xs">Capacity and notes are optional. Type must match an existing room type name (case-insensitive). Gender must be M or F.</span>
           </p>
 
-          <input
-            ref={fileRef}
-            type="file"
+          <FileDropZone
+            id="rooms-csv-file"
             accept=".csv,text/csv"
-            onChange={handleFile}
-            className="text-sm"
+            file={selectedFile}
+            onFileChange={handleFile}
+            disabled={importing}
+            hint="CSV files only"
           />
 
           {result && (
             <div className="space-y-4">
-              {/* Valid rows */}
+              {/* Summary — stays right under the file picker, before either capped list. */}
+              <p className="text-sm font-medium">
+                {result.valid.length} row{result.valid.length === 1 ? '' : 's'} ready to import
+                {' · '}{result.errors.length} row{result.errors.length === 1 ? '' : 's'} with problems
+              </p>
+
+              {/* Valid rows — capped preview, not a working view */}
               <div>
                 <h3 className="mb-2 text-sm font-medium text-status-paid">
                   Valid rows ({result.valid.length})
                 </h3>
                 {result.valid.length > 0 ? (
-                  <div className="max-h-48 overflow-y-auto rounded border">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted">
-                        <tr>
-                          {['#', 'Number', 'Type', 'Gender', 'Capacity', 'Notes'].map((h) => (
-                            <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {result.valid.map((row) => (
-                          <tr key={row.rowNum}>
-                            <td className="px-2 py-1 text-muted-foreground">{row.rowNum}</td>
-                            <td className="px-2 py-1">{row.number}</td>
-                            <td className="px-2 py-1">{row.roomTypeName}</td>
-                            <td className="px-2 py-1">{row.gender}</td>
-                            <td className="px-2 py-1">{row.capacity}</td>
-                            <td className="px-2 py-1 text-muted-foreground">{row.notes ?? '—'}</td>
+                  <>
+                    <div className="overflow-x-auto rounded border">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted">
+                          <tr>
+                            {['#', 'Number', 'Type', 'Gender', 'Capacity', 'Notes'].map((h) => (
+                              <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+                            ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y">
+                          {result.valid.slice(0, PREVIEW_LIMIT).map((row) => (
+                            <tr key={row.rowNum}>
+                              <td className="px-2 py-1 text-muted-foreground">{row.rowNum}</td>
+                              <td className="px-2 py-1">{row.number}</td>
+                              <td className="px-2 py-1">{row.roomTypeName}</td>
+                              <td className="px-2 py-1">{row.gender}</td>
+                              <td className="px-2 py-1">{row.capacity}</td>
+                              <td className="px-2 py-1 text-muted-foreground">{row.notes ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {result.valid.length > PREVIEW_LIMIT && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        …and {result.valid.length - PREVIEW_LIMIT} more.
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-xs text-muted-foreground">None.</p>
                 )}
               </div>
 
-              {/* Error rows */}
+              {/* Error rows — preview only */}
               {result.errors.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-medium text-destructive">
                     Errors ({result.errors.length}) — these rows will be skipped
                   </h3>
-                  <ul className="max-h-32 space-y-1 overflow-y-auto rounded border p-2">
-                    {result.errors.map((err) => (
+                  <ul className="space-y-1 rounded border p-2">
+                    {result.errors.slice(0, PREVIEW_LIMIT).map((err) => (
                       <li key={err.rowNum} className="text-xs">
                         <span className="font-medium">Row {err.rowNum}:</span>{' '}
                         <span className="text-destructive">{err.reason}</span>
@@ -225,23 +244,32 @@ export function CsvImportModal({
                       </li>
                     ))}
                   </ul>
+                  {result.errors.length > PREVIEW_LIMIT && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      …and {result.errors.length - PREVIEW_LIMIT} more.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           )}
+        </DialogBody>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { onOpenChange(false); reset() }}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!result || result.valid.length === 0 || importing}
-            >
-              {importing ? 'Importing…' : `Import ${result?.valid.length ?? 0} rooms`}
-            </Button>
-          </div>
-        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onOpenChange(false); reset() }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleImport}
+            disabled={!result || result.valid.length === 0 || importing}
+          >
+            {importing
+              ? 'Importing…'
+              : result
+                ? `Import ${result.valid.length} room${result.valid.length === 1 ? '' : 's'}`
+                : 'Import rooms'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
