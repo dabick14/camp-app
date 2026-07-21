@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onRoomAssigned = exports.setPaymentClaim = exports.setLeaderActive = exports.leaderRegisterParticipant = exports.provisionLeader = exports.adminAddParticipant = void 0;
+exports.onRoomAssigned = exports.setPaymentClaim = exports.setLeaderActive = exports.leaderRegisterParticipant = exports.provisionLeader = exports.adminBulkImportParticipants = exports.adminAddParticipant = void 0;
 const app_1 = require("firebase-admin/app");
 (0, app_1.initializeApp)();
 var adminAddParticipant_1 = require("./adminAddParticipant");
 Object.defineProperty(exports, "adminAddParticipant", { enumerable: true, get: function () { return adminAddParticipant_1.adminAddParticipant; } });
+var adminBulkImportParticipants_1 = require("./adminBulkImportParticipants");
+Object.defineProperty(exports, "adminBulkImportParticipants", { enumerable: true, get: function () { return adminBulkImportParticipants_1.adminBulkImportParticipants; } });
 var provisionLeader_1 = require("./provisionLeader");
 Object.defineProperty(exports, "provisionLeader", { enumerable: true, get: function () { return provisionLeader_1.provisionLeader; } });
 var leaderRegisterParticipant_1 = require("./leaderRegisterParticipant");

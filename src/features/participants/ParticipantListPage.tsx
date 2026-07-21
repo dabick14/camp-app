@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,7 @@ import type { SubGroup, SuperGroup } from '@/features/camps/types'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { type Participant, type PaymentState, derivePaymentState } from './types'
 import { DetailDrawer } from './components/DetailDrawer'
+import { ImportCsvModal } from './components/ImportCsvModal'
 import { PageTitle } from '@/components/ui/page-title'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -390,6 +391,9 @@ export function ParticipantListPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(1)
 
+  // ─── import CSV modal ───────────────────────────────────────────────────────
+  const [importModalOpen, setImportModalOpen] = useState(false)
+
   // ─── drawer ─────────────────────────────────────────────────────────────────
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedParticipant = participants.find((p) => p.id === selectedId) ?? null
@@ -569,7 +573,7 @@ export function ParticipantListPage() {
             </button>
           )}
         </div>
-        {/* Row 2: Filters button + Add participant */}
+        {/* Row 2: Filters button + Import CSV + Add participant */}
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
@@ -583,10 +587,16 @@ export function ParticipantListPage() {
             <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
             {activeFilterCount > 0 ? `Filters · ${activeFilterCount}` : 'Filters'}
           </button>
-          <Button size="sm" onClick={() => navigate('participants/new')}>
-            <Plus className="h-4 w-4" />
-            Add participant
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setImportModalOpen(true)}>
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button size="sm" onClick={() => navigate('participants/new')}>
+              <Plus className="h-4 w-4" />
+              Add participant
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -684,11 +694,17 @@ export function ParticipantListPage() {
           )}
         </div>
 
-        {/* Add participant button */}
-        <Button size="sm" className="shrink-0" onClick={() => navigate('participants/new')}>
-          <Plus className="h-4 w-4" />
-          Add participant
-        </Button>
+        {/* Import CSV + Add participant */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportModalOpen(true)}>
+            <Upload className="h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button size="sm" onClick={() => navigate('participants/new')}>
+            <Plus className="h-4 w-4" />
+            Add participant
+          </Button>
+        </div>
       </div>
 
       {/* ── Mobile filter sheet ───────────────────────────────────────────── */}
@@ -1110,6 +1126,19 @@ export function ParticipantListPage() {
         onClose={() => setSelectedId(null)}
         onMutated={refresh}
       />
+
+      {/* Import CSV modal */}
+      {camp && (
+        <ImportCsvModal
+          open={importModalOpen}
+          onOpenChange={setImportModalOpen}
+          campId={camp.id}
+          subGroups={subGroups}
+          roomTypes={roomTypes}
+          participants={participants}
+          onImported={refresh}
+        />
+      )}
     </PageContainer>
   )
 }
