@@ -17,8 +17,12 @@ import {
 import { formatMoney } from '@/lib/formatMoney'
 import { PageContainer } from '@/components/ui/page-container'
 
-const ADMIN_ADD_URL =
-  'https://us-central1-camp-app-119bb.cloudfunctions.net/adminAddParticipant'
+// DEV-only emulator override — without this, a raw fetch() to the prod URL
+// sends an emulator-issued ID token to real Firebase Auth for verification,
+// which always fails with 401. See adminBulkImportParticipants for the same fix.
+const ADMIN_ADD_URL = import.meta.env.DEV
+  ? 'http://127.0.0.1:5001/camp-app-119bb/us-central1/adminAddParticipant'
+  : 'https://us-central1-camp-app-119bb.cloudfunctions.net/adminAddParticipant'
 
 function Field({
   label,
