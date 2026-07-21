@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -164,7 +165,7 @@ export function RoomPickerModal({
           )}
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+        <DialogBody className="px-5 py-3 space-y-4">
           {/* Overbook confirmation banner */}
           {pendingOverbookRoom && (
             <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 space-y-2">
@@ -308,7 +309,7 @@ export function RoomPickerModal({
               </div>
             ))
           )}
-        </div>
+        </DialogBody>
 
         <div className="border-t px-5 py-3 shrink-0">
           <Button variant="outline" className="w-full" onClick={onClose} disabled={assigning}>

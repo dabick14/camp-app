@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase-admin/app'
 initializeApp()
 
 export { adminAddParticipant } from './adminAddParticipant'
+export { adminBulkImportParticipants } from './adminBulkImportParticipants'
 export { provisionLeader } from './provisionLeader'
 export { leaderRegisterParticipant } from './leaderRegisterParticipant'
 export { setLeaderActive } from './setLeaderActive'
