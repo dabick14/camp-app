@@ -153,6 +153,17 @@ describe('participants rules — leader CANNOT write amountPaid or rooming field
     )
   })
 
+  it('denies a leader writing roomedInDifferentType directly', async () => {
+    const ctx = testEnv.authenticatedContext(leaderUid)
+    await assertFails(
+      ctx.firestore().doc(`camps/${campId}/participants/${participantId}`).update({
+        roomedInDifferentType: true,
+        roomedInDifferentTypeNote: 'Premium full',
+        roomedInDifferentTypeFrom: 'Standard',
+      }),
+    )
+  })
+
   it('denies a leader writing amountPaid alongside allowed fields (no piggyback)', async () => {
     const ctx = testEnv.authenticatedContext(leaderUid)
     await assertFails(
@@ -285,6 +296,25 @@ describe('participants rules — admin cannot change feeOwed/roomTypePreferenceI
       ctx.firestore().doc(`camps/${campId}/participants/${confirmedParticipantId}`).update({
         notes: 'Late arrival confirmed by coordinator',
         tags: ['Worker'],
+        updatedAt: new Date(),
+        updatedBy: adminUid,
+      }),
+    )
+  })
+
+  // Different-type room assignment writes roomId/roomedInDifferentType*, never
+  // feeOwed/roomTypePreference* — so the confirmed-payment lock above must not
+  // apply to it, even on a CONFIRMED participant.
+  it('allows admin to assign a different-type room (with override fields) on a confirmed participant', async () => {
+    const ctx = testEnv.authenticatedContext(adminUid)
+    await assertSucceeds(
+      ctx.firestore().doc(`camps/${campId}/participants/${confirmedParticipantId}`).update({
+        roomId: 'room-999',
+        roomNumber: '999',
+        checkInState: 'ARRIVED',
+        roomedInDifferentType: true,
+        roomedInDifferentTypeNote: 'Premium full',
+        roomedInDifferentTypeFrom: 'Standard',
         updatedAt: new Date(),
         updatedBy: adminUid,
       }),

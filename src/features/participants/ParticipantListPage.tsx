@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Plus, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Info, Plus, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1074,6 +1074,12 @@ export function ParticipantListPage() {
                         <span className="inline-flex items-center gap-0.5 rounded bg-destructive/10 px-1.5 py-0.5 text-xs font-medium text-destructive">
                           <AlertTriangle className="h-3 w-3" />
                           Override
+                        </span>
+                      )}
+                      {p.roomedInDifferentType && (
+                        <span className="inline-flex items-center gap-0.5 rounded bg-status-partial-bg px-1.5 py-0.5 text-xs font-medium text-status-partial">
+                          <Info className="h-3 w-3" />
+                          Diff. type
                         </span>
                       )}
                     </span>
