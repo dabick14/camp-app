@@ -152,10 +152,13 @@ export async function assignRoom(
   campId: string,
   participantId: string,
   participantGender: 'M' | 'F',
+  participantRoomTypePreferenceId: string,
+  participantRoomTypePreferenceName: string,
   oldRoomId: string | null | undefined,
   newRoomId: string,
   roomTypesCache: RoomType[],
   overrideReason: string | null,
+  differentTypeReason: string | null,
   uid: string,
 ): Promise<string> {
   let assignedRoomNumber = ''
@@ -230,6 +233,14 @@ export async function assignRoom(
     if (overrideReason !== null) {
       participantUpdate.roomedWithoutFullPayment = true
       participantUpdate.roomedWithoutFullPaymentNote = overrideReason
+    }
+    // Different-type override — fee and roomTypePreference* are deliberately
+    // untouched (see field comment in types.ts). Only applies when the room
+    // actually assigned differs from what the participant registered for.
+    if (differentTypeReason !== null && nr.roomTypeId !== participantRoomTypePreferenceId) {
+      participantUpdate.roomedInDifferentType = true
+      participantUpdate.roomedInDifferentTypeNote = differentTypeReason
+      participantUpdate.roomedInDifferentTypeFrom = participantRoomTypePreferenceName
     }
     tx.update(pRef(campId, participantId), participantUpdate)
 

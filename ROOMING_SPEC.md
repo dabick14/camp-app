@@ -43,6 +43,31 @@ This makes overrides explicit and uncomfortable, without making them impossible.
 ### Clearing the flag
 Manual only. If a later payment brings the participant to PAID, the flag stays for audit. Admin can manually clear via participant detail ("Mark as resolved" — sets flag to false, keeps audit timestamp).
 
+## Different-type override
+
+The room picker filters to the participant's gender AND their registered room type by default — this is the safe path, so admins don't accidentally room someone into a type they didn't pay for. But when that type is full, reality needs an escape hatch.
+
+1. Room picker has a "Show all room types" toggle (off by default). Turning it on widens the type filter; gender filtering is never relaxed.
+2. Rooms of a non-matching type are visually marked in the list (group label badge + they're grouped separately from the registered type, which always sorts first).
+3. If the admin picks a room whose type differs from the participant's registered type:
+   - Confirm: "{Name} registered for {RegisteredType} but Room {Number} is a {ActualType}. Assign anyway?"
+   - Required reason text input (e.g. "Premium full")
+   - On confirm:
+     - Set `participant.roomedInDifferentType: true`
+     - Set `participant.roomedInDifferentTypeNote: {reason}`
+     - Set `participant.roomedInDifferentTypeFrom: {registeredTypeName}`
+     - `roomTypePreferenceId`, `roomTypePreferenceName`, and `feeOwed` are **not** touched — this is a placement, not a room-type change. Use the separate "Change Room Type" action when the fee should actually change (e.g. a real upgrade).
+4. This stacks independently with the payment override above — a PENDING participant assigned a different type gets both flags and both reasons on record.
+
+### Visibility
+- Participant detail: amber banner (informational, not the red used for payment overrides — this is a service note, not a money error) showing registered-vs-actual type and the reason
+- Participant list: a visible badge ("Diff. type"), always shown, not hover-only
+- Dashboard: a "Roomed in different type: N" counter, amber/info styled (not the red "warn" treatment)
+- No CSV export of participants exists yet in this codebase (only CSV *import*) — when one is built, it should include this flag, note, and registered-vs-actual type, same as the payment override.
+
+### Clearing the flag
+No clear action in v1 — unlike the payment override, this is a permanent placement record (what they registered for vs. what they actually got), useful at teardown to identify everyone who needs a service follow-up.
+
 ## Desk flow
 Goal: paid participant standing at desk → roomed and counted in under 30 seconds.
 

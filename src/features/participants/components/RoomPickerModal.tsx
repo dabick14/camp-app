@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle, Info, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { useCampData } from '@/features/camp-layout/CampDataContext'
 import { listRooms } from '@/features/rooms/services/roomService'
 import type { Room } from '@/features/rooms/types'
@@ -23,7 +25,7 @@ function naturalSort(a: Room, b: Room) {
   return a.number.localeCompare(b.number, undefined, { numeric: true, sensitivity: 'base' })
 }
 
-// Derive "3× Choir, 1× Youth Council" for a room's current occupants
+// Derive "3× Choir, 1× Youth" for a room's current occupants
 function subGroupLabel(roomId: string, participants: Participant[]): string {
   const occupants = participants.filter(
     (p) => p.roomId === roomId && p.registrationState === 'REGISTERED',
@@ -53,29 +55,32 @@ export function RoomPickerModal({
   const { id: campId } = useParams<{ id: string }>()
   const { roomTypes, participants } = useCampData()
 
+  // Rooms are fetched once, filtered to gender only — the room-type filter is
+  // applied client-side via `showAllTypes` so toggling it is instant.
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [assigning, setAssigning] = useState(false)
   const [showAdHoc, setShowAdHoc] = useState(false)
+  const [showAllTypes, setShowAllTypes] = useState(false)
   const [highlightedRoomId, setHighlightedRoomId] = useState<string | null>(null)
   const [pendingOverbookRoom, setPendingOverbookRoom] = useState<Room | null>(null)
+  // Different-type confirmation — set when the admin clicks a room whose type
+  // doesn't match what the participant registered for. Reason is required.
+  const [pendingDifferentTypeRoom, setPendingDifferentTypeRoom] = useState<Room | null>(null)
+  const [differentTypeReasonDraft, setDifferentTypeReasonDraft] = useState('')
+  // Carries a confirmed different-type reason through a SECOND confirmation
+  // (soft overbook) when a non-matching room is also at capacity.
+  const [confirmedDifferentTypeReason, setConfirmedDifferentTypeReason] = useState<string | null>(null)
   const highlightRef = useRef<HTMLButtonElement | null>(null)
 
-  // Fetch rooms once on open, filtered to the participant's gender AND their
-  // paid-for room type — admins assign within the type a participant paid for,
-  // not any type. Bumping to a different type happens via "Change Room Type".
   useEffect(() => {
     if (!campId) return
     setLoading(true)
     listRooms(campId).then((all) => {
-      setRooms(
-        all.filter(
-          (r) => r.gender === participant.gender && r.roomTypeId === participant.roomTypePreferenceId,
-        ),
-      )
+      setRooms(all.filter((r) => r.gender === participant.gender))
       setLoading(false)
     })
-  }, [campId, participant.gender, participant.roomTypePreferenceId])
+  }, [campId, participant.gender])
 
   // Scroll to highlighted room when it appears after ad-hoc creation
   useEffect(() => {
@@ -87,11 +92,7 @@ export function RoomPickerModal({
   async function refetchRooms() {
     if (!campId) return
     const all = await listRooms(campId)
-    setRooms(
-      all.filter(
-        (r) => r.gender === participant.gender && r.roomTypeId === participant.roomTypePreferenceId,
-      ),
-    )
+    setRooms(all.filter((r) => r.gender === participant.gender))
   }
 
   function handleAdHocCreated(roomId: string, roomNumber: string) {
@@ -100,20 +101,24 @@ export function RoomPickerModal({
     toast.success(`Room ${roomNumber} created`)
   }
 
-  async function doAssign(room: Room) {
+  async function doAssign(room: Room, differentTypeReason: string | null) {
     if (!campId || assigning) return
     setAssigning(true)
     setPendingOverbookRoom(null)
+    setPendingDifferentTypeRoom(null)
     try {
       const uid = getAuth().currentUser?.email ?? getAuth().currentUser?.uid ?? 'admin'
       const roomNumber = await assignRoom(
         campId,
         participant.id,
         participant.gender,
+        participant.roomTypePreferenceId,
+        participant.roomTypePreferenceName,
         participant.roomId ?? null,
         room.id,
         roomTypes,
         overrideReason,
+        differentTypeReason,
         uid,
       )
       onAssigned(roomNumber)
@@ -121,6 +126,7 @@ export function RoomPickerModal({
       toast.error((err as Error)?.message ?? 'Assignment failed')
     } finally {
       setAssigning(false)
+      setConfirmedDifferentTypeReason(null)
     }
   }
 
@@ -128,26 +134,78 @@ export function RoomPickerModal({
     // Prevent re-assigning the same room
     if (room.id === participant.roomId) return
 
+    const rt = roomTypes.find((r) => r.id === room.roomTypeId)
     const isFull = room.currentOccupancy >= room.capacity
+    if (isFull && !rt?.allowOverbook) return // hard cap — disabled, shouldn't be clicked
+
+    const isDifferentType = room.roomTypeId !== participant.roomTypePreferenceId
+    if (isDifferentType) {
+      setDifferentTypeReasonDraft('')
+      setPendingDifferentTypeRoom(room)
+      return
+    }
+
     if (isFull) {
-      const rt = roomTypes.find((r) => r.id === room.roomTypeId)
-      if (!rt?.allowOverbook) return // hard cap — disabled, shouldn't be clicked
       // Soft overbook: ask for confirm
       setPendingOverbookRoom(room)
       return
     }
 
-    doAssign(room)
+    doAssign(room, null)
   }
 
-  // `rooms` is already filtered to participant.roomTypePreferenceId — only one
-  // group is ever shown. The header is kept for visual consistency with the
-  // list layout, just naming the participant's paid-for type.
-  const preferredType = roomTypes.find((rt) => rt.id === participant.roomTypePreferenceId)
-  const groups = preferredType && rooms.length > 0
-    ? [{ type: preferredType, rooms: rooms.slice().sort(naturalSort) }]
-    : []
+  function handleDifferentTypeConfirm() {
+    const room = pendingDifferentTypeRoom
+    const reason = differentTypeReasonDraft.trim()
+    if (!room || reason.length < 3) return
+    setPendingDifferentTypeRoom(null)
 
+    const rt = roomTypes.find((r) => r.id === room.roomTypeId)
+    const isFull = room.currentOccupancy >= room.capacity
+    if (isFull && rt?.allowOverbook) {
+      // Still needs the soft-overbook confirmation too — carry the reason forward.
+      setConfirmedDifferentTypeReason(reason)
+      setPendingOverbookRoom(room)
+      return
+    }
+
+    doAssign(room, reason)
+  }
+
+  // Group visible rooms by type. Default view shows only the participant's
+  // registered type; "Show all room types" widens this (gender stays filtered
+  // upstream). The registered type's group always sorts first.
+  const groups = useMemo(() => {
+    const visible = showAllTypes
+      ? rooms
+      : rooms.filter((r) => r.roomTypeId === participant.roomTypePreferenceId)
+
+    const byType = new Map<string, Room[]>()
+    for (const r of visible) {
+      const list = byType.get(r.roomTypeId)
+      if (list) list.push(r)
+      else byType.set(r.roomTypeId, [r])
+    }
+
+    return [...byType.entries()]
+      .map(([roomTypeId, typeRooms]) => {
+        const rt = roomTypes.find((t) => t.id === roomTypeId)
+        return {
+          roomTypeId,
+          typeName: typeRooms[0].roomTypeName,
+          allowOverbook: rt?.allowOverbook ?? false,
+          order: rt?.order ?? 0,
+          isPreferred: roomTypeId === participant.roomTypePreferenceId,
+          rooms: typeRooms.slice().sort(naturalSort),
+        }
+      })
+      .sort((a, b) => {
+        if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1
+        return a.order - b.order
+      })
+  }, [rooms, roomTypes, participant.roomTypePreferenceId, showAllTypes])
+
+  const preferredType = roomTypes.find((rt) => rt.id === participant.roomTypePreferenceId)
   const genderLabel = participant.gender === 'M' ? 'M' : 'F'
   const genderWord = participant.gender === 'M' ? 'male' : 'female'
 
@@ -166,6 +224,59 @@ export function RoomPickerModal({
         </DialogHeader>
 
         <DialogBody className="px-5 py-3 space-y-4">
+          {/* Show all room types toggle */}
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              checked={showAllTypes}
+              onCheckedChange={setShowAllTypes}
+              className="scale-90"
+            />
+            <span>
+              Show all room types
+              <span className="ml-1 text-xs text-muted-foreground">
+                (gender filter still applies)
+              </span>
+            </span>
+          </label>
+
+          {/* Different-type confirmation */}
+          {pendingDifferentTypeRoom && (
+            <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 space-y-2">
+              <p className="text-sm font-medium text-status-partial flex items-center gap-1.5">
+                <Info className="h-4 w-4 shrink-0" />
+                {participant.fullName} registered for {participant.roomTypePreferenceName} but
+                Room {pendingDifferentTypeRoom.number} is a {pendingDifferentTypeRoom.roomTypeName}.
+                Assign anyway?
+              </p>
+              <Textarea
+                autoFocus
+                value={differentTypeReasonDraft}
+                onChange={(e) => setDifferentTypeReasonDraft(e.target.value)}
+                placeholder='Reason, e.g. "Premium full"'
+                rows={2}
+                className="text-sm bg-background"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleDifferentTypeConfirm}
+                  disabled={assigning || differentTypeReasonDraft.trim().length < 3}
+                  className="border border-status-partial/40 bg-status-partial-bg text-status-partial hover:bg-status-partial-bg/70"
+                >
+                  {assigning ? 'Assigning…' : 'Assign anyway'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setPendingDifferentTypeRoom(null)}
+                  disabled={assigning}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Overbook confirmation banner */}
           {pendingOverbookRoom && (
             <div className="rounded-md border border-status-partial/30 bg-status-partial-bg p-3 space-y-2">
@@ -177,7 +288,7 @@ export function RoomPickerModal({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => doAssign(pendingOverbookRoom)}
+                  onClick={() => doAssign(pendingOverbookRoom, confirmedDifferentTypeReason)}
                   disabled={assigning}
                   className="border border-status-partial/40 bg-status-partial-bg text-status-partial hover:bg-status-partial-bg/70"
                 >
@@ -186,7 +297,7 @@ export function RoomPickerModal({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setPendingOverbookRoom(null)}
+                  onClick={() => { setPendingOverbookRoom(null); setConfirmedDifferentTypeReason(null) }}
                   disabled={assigning}
                 >
                   Cancel
@@ -222,25 +333,38 @@ export function RoomPickerModal({
             <p className="text-sm text-muted-foreground py-4 text-center">Loading rooms…</p>
           ) : groups.length === 0 ? (
             <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground space-y-2">
-              <p>
-                No {preferredType?.name ?? 'matching'} rooms available for {genderWord} participants.
-              </p>
-              <p>
-                To assign a different room type, change this participant's room type in their
-                detail drawer (this will update their fee).
-              </p>
+              {showAllTypes ? (
+                <p>No rooms available for {genderWord} participants at all.</p>
+              ) : (
+                <>
+                  <p>
+                    No {preferredType?.name ?? 'matching'} rooms available for {genderWord} participants.
+                  </p>
+                  <p>
+                    Turn on "Show all room types" above to assign a different type without
+                    changing their fee, or change this participant's room type in their detail
+                    drawer if the fee should change too.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
-            groups.map(({ type, rooms: typeRooms }) => (
-              <div key={type.id}>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {type.name}
+            groups.map((group) => (
+              <div key={group.roomTypeId}>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.typeName}
+                  {!group.isPreferred && (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-status-partial-bg px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-status-partial">
+                      <Info className="h-2.5 w-2.5" />
+                      Different type
+                    </span>
+                  )}
                 </p>
                 <div className="space-y-1">
-                  {typeRooms.map((room) => {
+                  {group.rooms.map((room) => {
                     const isFull = room.currentOccupancy >= room.capacity
-                    const isOverbook = isFull && type.allowOverbook
-                    const isHardFull = isFull && !type.allowOverbook
+                    const isOverbook = isFull && group.allowOverbook
+                    const isHardFull = isFull && !group.allowOverbook
                     const isCurrent = room.id === participant.roomId
                     const isHighlighted = room.id === highlightedRoomId
                     const occupancyLabel = isFull

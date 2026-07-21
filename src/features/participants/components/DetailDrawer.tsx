@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAuth } from 'firebase/auth'
-import { AlertTriangle, DoorOpen, X, Plus } from 'lucide-react'
+import { AlertTriangle, DoorOpen, Info, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Timestamp } from 'firebase/firestore'
 import { Badge } from '@/components/ui/badge'
@@ -98,7 +98,7 @@ export function DetailDrawer({
   onMutated: () => void
 }) {
   const { id: campId } = useParams<{ id: string }>()
-  const { roomTypes } = useCampData()
+  const { roomTypes, rooms } = useCampData()
 
   const open = participant !== null
 
@@ -453,6 +453,23 @@ export function DetailDrawer({
                       Mark as resolved
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* Different-type flag banner — informational, not a money error */}
+              {p.roomedInDifferentType && (
+                <div className="rounded-md border border-status-partial/30 bg-status-partial-bg px-4 py-3 text-sm text-status-partial space-y-1">
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <Info className="h-4 w-4 shrink-0" />
+                    Roomed in a different room type
+                  </p>
+                  <p className="text-status-partial/90">
+                    Registered for {p.roomedInDifferentTypeFrom ?? p.roomTypePreferenceName}, placed in{' '}
+                    {rooms.find((r) => r.id === p.roomId)?.roomTypeName ?? p.roomNumber ?? 'a different room'}.
+                    {p.roomedInDifferentTypeNote && (
+                      <span> Reason: "{p.roomedInDifferentTypeNote}"</span>
+                    )}
+                  </p>
                 </div>
               )}
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Info, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageTitle } from '@/components/ui/page-title'
 import {
@@ -14,17 +14,27 @@ import { formatMoney } from '@/lib/formatMoney'
 import { ReportButton } from '@/features/reports/components/ReportButton'
 import { generateRegistrationCountsReport } from '@/features/reports/generators'
 
-function BigMetric({ label, value, sub, warn, accent, skeleton }: {
-  label: string; value: number; sub?: string; warn?: boolean; accent?: boolean; skeleton?: boolean
+function BigMetric({ label, value, sub, warn, info, accent, skeleton }: {
+  label: string; value: number; sub?: string; warn?: boolean; info?: boolean; accent?: boolean; skeleton?: boolean
 }) {
-  const alert = !skeleton && warn && value > 0
+  const alertWarn = !skeleton && warn && value > 0
+  // "info" is the amber/informational treatment — for service notes that
+  // aren't money errors and shouldn't read as alarming as `warn` (red).
+  const alertInfo = !skeleton && info && value > 0
   return (
-    <div className={`rounded-lg border px-5 py-4 ${alert ? 'border-destructive/20 bg-destructive/5 text-foreground' : 'bg-card text-card-foreground'}`}>
+    <div className={`rounded-lg border px-5 py-4 ${
+      alertWarn
+        ? 'border-destructive/20 bg-destructive/5 text-foreground'
+        : alertInfo
+        ? 'border-status-partial/30 bg-status-partial-bg text-foreground'
+        : 'bg-card text-card-foreground'
+    }`}>
       <div className="flex items-center gap-1.5">
-        {alert && <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />}
+        {alertWarn && <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />}
+        {alertInfo && <Info className="h-4 w-4 shrink-0 text-status-partial" />}
         {skeleton
           ? <span className="my-0.5 block h-9 w-14 animate-pulse rounded bg-muted" />
-          : <p className={`text-3xl font-bold tabular-nums ${alert ? 'text-destructive' : accent ? 'text-primary' : ''}`}>{value.toLocaleString()}</p>
+          : <p className={`text-3xl font-bold tabular-nums ${alertWarn ? 'text-destructive' : alertInfo ? 'text-status-partial' : accent ? 'text-primary' : ''}`}>{value.toLocaleString()}</p>
         }
       </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
@@ -75,7 +85,7 @@ export function DashboardPage() {
 
   // ─── top-level metrics (always needed — power the summary cards) ────────────
   const metrics = useMemo(() => {
-    let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0, overrides = 0
+    let paid = 0, partial = 0, pending = 0, waived = 0, roomed = 0, overrides = 0, differentType = 0
     let totalMoneyPaid = 0, totalFeeOwed = 0
     for (const p of active) {
       const ps = derivePaymentState(p)
@@ -85,11 +95,12 @@ export function DashboardPage() {
       else if (ps === 'WAIVED') waived++
       if (p.roomId) roomed++
       if (p.roomedWithoutFullPayment) overrides++
+      if (p.roomedInDifferentType) differentType++
       totalMoneyPaid += p.amountPaid
       totalFeeOwed += p.feeOwed
     }
     const totalMoneyOwed = Math.max(0, totalFeeOwed - totalMoneyPaid)
-    return { registered: active.length, paid, partial, pending, waived, roomed, overrides, totalMoneyPaid, totalMoneyOwed }
+    return { registered: active.length, paid, partial, pending, waived, roomed, overrides, differentType, totalMoneyPaid, totalMoneyOwed }
   }, [active])
 
   // ─── By sub-group (default tab — computed immediately) ─────────────────────
@@ -233,13 +244,14 @@ export function DashboardPage() {
       {loading || error ? null : <>
 
       {/* Summary cards — people counts */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <BigMetric label="Registered" value={metrics.registered} accent skeleton={participantsPending} />
         <BigMetric label="Paid" value={metrics.paid} sub={`${metrics.waived} waived`} skeleton={participantsPending} />
         <BigMetric label="Partial" value={metrics.partial} skeleton={participantsPending} />
         <BigMetric label="Pending" value={metrics.pending} skeleton={participantsPending} />
         <BigMetric label="Roomed" value={metrics.roomed} skeleton={participantsPending} />
         <BigMetric label="Overrides" value={metrics.overrides} warn skeleton={participantsPending} />
+        <BigMetric label="Roomed in different type" value={metrics.differentType} info skeleton={participantsPending} />
       </div>
 
       {/* Money totals — visually distinct from people counts */}

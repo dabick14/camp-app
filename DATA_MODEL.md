@@ -200,6 +200,18 @@ No mixed-gender flag. Couple rooms and 24 Houses-style rooms use `defaultCapacit
   roomedWithoutFullPayment: boolean;
   roomedWithoutFullPaymentNote?: string;
 
+  // Audit-only override flag — different from roomedWithoutFullPayment.
+  // Set when admin assigns a room whose TYPE differs from roomTypePreferenceId
+  // (their registered type was unavailable). Does NOT imply a fee or type
+  // change — roomTypePreferenceId/Name and feeOwed are untouched by this path.
+  // roomedInDifferentTypeFrom snapshots the type name at override time, so it
+  // stays accurate even if a later "Change Room Type" changes roomTypePreferenceName.
+  // Visible in UI as an amber banner/badge (informational, not Alert Red) and
+  // counted on dashboard.
+  roomedInDifferentType?: boolean;
+  roomedInDifferentTypeNote?: string;
+  roomedInDifferentTypeFrom?: string;
+
   // Check-in audit
   checkedInBy?: string;
   checkedInAt?: Timestamp;
@@ -375,6 +387,16 @@ When admin clicks Assign Room and the participant's derived `paymentState` is `P
 - All other transaction steps proceed normally
 
 If a later payment moves them to PAID, the flag stays `true` (for audit). To clear it, admin must manually unset (or it persists as an "was once short" indicator — design choice).
+
+### Different-type override on room assignment
+The room picker defaults to the participant's `roomTypePreferenceId` (gender always enforced). Admins can widen it with a "Show all room types" toggle when the registered type is unavailable. When the admin assigns a room whose type differs from `roomTypePreferenceId`:
+- Show confirmation: "{Name} registered for {RegisteredType} but Room {Number} is a {ActualType}. Assign anyway?"
+- Required text input for reason
+- On confirm, set `roomedInDifferentType: true`, `roomedInDifferentTypeNote: {reason}`, `roomedInDifferentTypeFrom: {registeredTypeName}`
+- `roomTypePreferenceId`, `roomTypePreferenceName`, and `feeOwed` are NEVER touched — this is an operational placement, not a fee change, so the confirmed-payment room-type-change lock is irrelevant here (no room-type field is written)
+- All other transaction steps proceed normally, and this stacks independently with the payment override above (a PENDING participant roomed in a different type gets both flags)
+
+This flag has no "clear" action in v1 — it's a permanent placement record, unlike the payment override which can be marked resolved.
 
 ## Transactions (unchanged from prior spec)
 - Creating allocations from CSV upload — see PAYMENTS_SPEC.md

@@ -34,6 +34,14 @@ export interface Participant {
   confirmedBatchId?: string
   roomedWithoutFullPayment?: boolean
   roomedWithoutFullPaymentNote?: string
+  // Set when admin assigns a room of a DIFFERENT type than roomTypePreferenceId
+  // (their type was unavailable). roomTypePreferenceId/Name and feeOwed are
+  // NEVER touched by this path — it's an operational placement, not a fee
+  // change. roomedInDifferentTypeFrom snapshots the type they registered for
+  // at override time, decoupled from any later legitimate "Change Room Type".
+  roomedInDifferentType?: boolean
+  roomedInDifferentTypeNote?: string
+  roomedInDifferentTypeFrom?: string
   checkedInBy?: string
   checkedInAt?: Timestamp
   source?: 'self' | string
