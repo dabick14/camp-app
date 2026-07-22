@@ -187,13 +187,23 @@ export function DashboardPage() {
   const byRoomType = useMemo(() => {
     if (!seenRoomType) return null
     return roomTypes.map((rt) => {
-      const preferredBy = active.filter((p) => p.roomTypePreferenceId === rt.id).length
+      const preferrers = active.filter((p) => p.roomTypePreferenceId === rt.id)
+      let paid = 0, partial = 0, pending = 0, waived = 0, totalReceived = 0
+      for (const p of preferrers) {
+        const ps = derivePaymentState(p)
+        if (ps === 'PAID') paid++
+        else if (ps === 'PARTIAL') partial++
+        else if (ps === 'PENDING') pending++
+        else if (ps === 'WAIVED') waived++
+        totalReceived += p.amountPaid
+      }
       const typeRooms = rooms.filter((r) => r.roomTypeId === rt.id)
       const capacityTotal = typeRooms.reduce((s, r) => s + r.capacity, 0)
       const occupied = typeRooms.reduce((s, r) => s + r.currentOccupancy, 0)
       return {
         id: rt.id, name: rt.name, price: rt.price,
-        preferredBy, capacityTotal, occupied, available: capacityTotal - occupied,
+        preferredBy: preferrers.length, paid, partial, pending, waived, totalReceived,
+        capacityTotal, occupied, available: capacityTotal - occupied,
       }
     })
   }, [seenRoomType, active, roomTypes, rooms])
@@ -377,6 +387,11 @@ export function DashboardPage() {
                     <TableHead>Room type</TableHead>
                     <TableHead className="text-right">Price ({currency})</TableHead>
                     <TableHead className="text-right">Preferred by</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Partial</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
+                    <TableHead className="text-right">Waived</TableHead>
+                    <TableHead className="text-right">Confirmed ({currency})</TableHead>
                     <TableHead className="text-right">Total capacity</TableHead>
                     <TableHead className="text-right">Occupied</TableHead>
                     <TableHead className="text-right">Available</TableHead>
@@ -385,7 +400,7 @@ export function DashboardPage() {
                 <TableBody>
                   {byRoomType.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center text-muted-foreground">
                         No room types
                       </TableCell>
                     </TableRow>
@@ -397,6 +412,13 @@ export function DashboardPage() {
                           {formatMoney(row.price, currency)}
                         </TableCell>
                         <TableCell className="text-right">{row.preferredBy}</TableCell>
+                        <TableCell className="text-right text-status-paid">{row.paid}</TableCell>
+                        <TableCell className="text-right text-status-partial">{row.partial}</TableCell>
+                        <TableCell className="text-right text-status-pending">{row.pending}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{row.waived}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(row.totalReceived, currency)}
+                        </TableCell>
                         <TableCell className="text-right">{row.capacityTotal}</TableCell>
                         <TableCell className="text-right">{row.occupied}</TableCell>
                         <TableCell
